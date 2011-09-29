@@ -40,6 +40,7 @@
 #include "transform.h"
 #include "syntheticrule.h"
 #include "gpurule.h"
+#include "unrollingoptimizer.h"
 
 #include "common/jconvert.h"
 
@@ -115,6 +116,7 @@ void petabricks::UserRule::compileRuleBody(Transform& tx, RIRScope& parentScope)
   DebugPrintPass    print;
   ExpansionPass     expand(tx, *this, scope);
   AnalysisPass      analysis(*this, tx.name(), scope);
+  UnrollingOptimizer unrolling;
 #ifdef HAVE_OPENCL
   OpenClCleanupPass opencl(*this, scope);
   OpenClFunctionRejectPass openclfnreject(*this, scope);
@@ -131,7 +133,8 @@ void petabricks::UserRule::compileRuleBody(Transform& tx, RIRScope& parentScope)
 
   bodyir->accept(expand);
   bodyir->accept(analysis);
-
+  bodyir->accept(unrolling);
+  
   _bodyirStatic = bodyir;
   _bodyirDynamic = bodyir;
   

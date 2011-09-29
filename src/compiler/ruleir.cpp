@@ -247,9 +247,351 @@ petabricks::RIRExprCopyRef& petabricks::RIRStmt::part(int n) {
 }
 
 
+std::string petabricks::RIRLoopStmt::getLimit() {
+  std::string inductionVar = getInductionVariable();
+  
+  RIRExprCopyRef& test = testPart();
+  
+  if(!test) {
+    //There is no explicit limit to the loop!
+    return "";
+  }
+  
+  JASSERT(test->isComparison())(test);
+  std::string compOp = test->getComparisonOp();
+  RIRExpr LHS = test->getLHS(compOp);
+  RIRExpr RHS = test->getRHS(compOp);
+          
+  if(LHS.toString() == inductionVar) {
+    return RHS.toString();
+  }
+  else if(RHS.toString() == inductionVar) {
+    return LHS.toString();
+  }
+  
+  UNIMPLEMENTED();
+  abort(); //Implement this case
+}
+
+
+void petabricks::RIRLoopStmt::computeInductionVariable() {
+  RIRExprCopyRef& increment = incPart();
+  
+  //Force new computation of the induction varible
+  _iterationDirection = '\0';
+  
+  if(increment->type()==EXPR_CHAIN) {
+    computeInductionVariableFromIncrement();
+  }
+  
+  if(_iterationDirection=='\0') {
+    computeInductionVariableFromBody();
+  }
+}
+
+
+///Returns the name of the induction variable or "" if it is impossible to find it here
+///It also sets the iteration direction of the found induction variable ('\0' if not found)
+void petabricks::RIRLoopStmt::computeInductionVariableFromIncrement() {
+  RIRExprCopyRef& increment = incPart();
+  
+  if(increment->partsNumber() == 2) {
+    RIRExprCopyRef const& part0 = increment->part(0);
+    RIRExprCopyRef const& part1 = increment->part(1);
+
+    if(part1->isLeaf("++")) {
+      // Case: i++
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '+';
+      _inductionVariable = part0->toString();
+      return;
+    }
+    else if(part0->isLeaf("++")) {
+      // Case ++i
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '+';
+      _inductionVariable = part1->toString();
+      return;
+    }
+    else if(part1->isLeaf("--")) {
+      // Case: i--
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '-';
+      _inductionVariable = part0->toString();
+      return;
+    }
+    else if(part0->isLeaf("--")) {
+      // Case --i
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '-';
+      _inductionVariable = part1->toString();
+      return;
+    }
+    
+    UNIMPLEMENTED();
+    abort(); //Implement this case
+  }
+  else if(increment->partsNumber() == 3) {
+    RIRExprCopyRef const& part0 = increment->part(0);
+    RIRExprCopyRef const& part1 = increment->part(1);
+    
+    if (part1->isLeaf("+=")) {
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '+';
+      _inductionVariable = part0->toString();
+      return;
+    }
+    else if (part1->isLeaf("-=")) {
+      _inductionIncrement = increment->toString();
+      _iterationDirection = '-';
+      _inductionVariable = part0->toString();
+      return;
+    }
+    else if (part1->isLeaf("*=") || part1->isLeaf("/=")) {
+      //NOT a valid induction variable
+      _iterationDirection = '\0';
+      return;
+    }
+  }
+  else if(increment->partsNumber() == 5) {
+    RIRExprCopyRef const& part1 = increment->part(1);
+    
+    if(part1->isLeaf("=")) {
+      RIRExprCopyRef const& part0 = increment->part(0);
+      RIRExprCopyRef const& part2 = increment->part(2);
+      RIRExprCopyRef const& part3 = increment->part(3);
+      RIRExprCopyRef const& part4 = increment->part(4);
+      
+ 
+      if(   (part0->toString() == part2->toString() && part4->type() == EXPR_LIT)  //Case: i = i + c
+         || (part0->toString() == part4->toString() && part2->type() == EXPR_LIT)) //Case: i = c + i
+      {
+        if(part3->isLeaf("+")) {
+          _inductionIncrement = increment->toString();
+          _iterationDirection='+';
+          _inductionVariable = part0->toString();
+          return;
+        }
+        else if (part3->isLeaf("-")) {
+          _inductionIncrement = increment->toString();
+          _iterationDirection='-';
+          _inductionVariable = part0->toString();
+          return;
+        }
+      }
+    }
+  }
+  
+  JWARNING(false && "InductionVariableIdentifier - Should handle this case better")(increment->typeStr())(increment);
+  UNIMPLEMENTED(); abort(); //Implement this case
+}  
 
 
 
+void petabricks::RIRLoopStmt::computeInductionVariableFromBody() {
+  InductionVariableIdentifier identifierVisitor;
+  
+  _iterationDirection = identifierVisitor.getIterationDirectionFromBody(*this);
+  _inductionIncrement = identifierVisitor.getInductionIncrementFromBody(*this);
+  _inductionVariable = identifierVisitor.getInductionVariableFromBody(*this);
+}
+
+
+bool petabricks::RIRExpr::containsBoolOp() const {
+  if(   containsLeaf("&&") 
+     || containsLeaf("&")
+     || containsLeaf("||")
+     || containsLeaf("|")
+     || containsLeaf("!")
+     || containsLeaf("^")) {
+       return true;
+     }
+  return false;
+}
+
+petabricks::RIRExpr petabricks::RIRExpr::getLHS(std::string splitToken) const {
+  JASSERT(isAssignment() || isComparison());
+  
+  RIRExpr lhs(EXPR_CHAIN);
+  
+  for(RIRExprList::const_iterator i=_parts.begin(), e=_parts.end(); i!=e; ++i) {
+    if((*i)->isLeaf(splitToken.c_str())) {
+      return lhs;
+    }
+    
+    lhs.addSubExpr(*i);
+  }
+  
+  //Should never reach here: is the expression really an assigment?
+  abort();
+}
 
 
 
+petabricks::RIRExpr petabricks::RIRExpr::getRHS(std::string splitToken) const {
+  JASSERT(isAssignment() || isComparison());
+  
+  RIRExpr rhs(EXPR_CHAIN);
+  
+  ///Reach the "=" sign
+  RIRExprList::const_iterator i;
+  for(i=_parts.begin(); ! (*i)->isLeaf(splitToken.c_str()); ++i);
+  
+  //Get first rhs part
+  ++i;
+  
+  for(RIRExprList::const_iterator e=_parts.end(); i!=e; ++i) {
+    rhs.addSubExpr(*i);
+  }
+  
+  return rhs;
+}
+
+
+#define checkOp(op) if(containsLeaf(op)) { return op; }
+std::string petabricks::RIRExpr::getComparisonOp() const {
+  /* TODO: an expression could contain multiple comparison operators
+   * such as in:
+   * (a==b) && (c<d)
+   * This is not supported yet! Only a single comparison operator is supported
+   */
+  
+  checkOp("==");
+  checkOp("!=");
+  checkOp(">=");
+  checkOp("<=");
+  checkOp("<");
+  checkOp(">");
+  
+  return "";
+}
+
+
+void petabricks::RIRLoopStmt::InductionVariableIdentifier::computeInductionVariableAndIterationDirectionFromBody(RIRLoopStmt& loop) {
+  RIRStmtCopyRef& loopBody = loop.body();
+  loopBody->accept(*this);
+  
+  //Remove variables with more than one assignment: thay cannot be induction variables
+  CounterMap::iterator i=_variableAssignmentNumber.begin(), e=_variableAssignmentNumber.end(), next;
+  while(i != e) {
+    JTRACE("assignment")(i->first)(i->second.count)(i->second.iterationDirection);
+    if(i->second.count != 1) {
+      next=i;
+      next++;
+      
+      _variableAssignmentNumber.erase(i);
+      i=next;
+    }
+    else {
+      ++i;
+    }
+  }
+  
+  CounterMap::iterator indVar;
+  if(_variableAssignmentNumber.size() == 0) {
+    //No induction variable here!
+    JWARNING(false && "MissingInductionVariable")(loopBody);
+    return;
+  }
+  if(_variableAssignmentNumber.size() > 1) {
+    //Debug print
+    JTRACE("Multiple assignments")(loopBody);
+    for (CounterMap::iterator i=_variableAssignmentNumber.begin(), e=_variableAssignmentNumber.end(); i!=e; ++i) {
+      JTRACE("Assignment")(i->first)(i->second.count)(i->second.iterationDirection);
+    }
+    
+    //Implementation
+    //If only one of the candidates appear in the loop condition, it is the induction variable
+    RIRExprCopyRef& loopCondition = loop.testPart();
+    indVar = _variableAssignmentNumber.end();
+    for (CounterMap::iterator i=_variableAssignmentNumber.begin(), e=_variableAssignmentNumber.end(); i!=e; ++i) {
+      std::string candidateVarName = i->first;
+      if(loopCondition->containsLeaf(candidateVarName.c_str())) {
+        if(indVar!=e) {
+          //This is not the only single-assigned variable to appear in the condition
+          UNIMPLEMENTED();
+          abort();
+        }
+        
+        //First single-assigned variable to appear in the condition
+        indVar = i;
+      }
+    }
+    
+    if(indVar == _variableAssignmentNumber.end()) {
+      //No single-assigned variable appears in the condition
+      UNIMPLEMENTED();
+      abort();
+    }
+  }
+  else {
+    //Only one variable with a single assignment: it's the induction variable
+    indVar = _variableAssignmentNumber.begin();
+  }
+  _inductionVariable = indVar->first;
+  _iterationDirection = indVar->second.iterationDirection;
+  _inductionIncrement = indVar->second.inductionIncrement;
+}
+
+void petabricks::RIRLoopStmt::InductionVariableIdentifier::before(RIRExprCopyRef& expr) {
+  //Count how many times each variable is assigned
+  JTRACE("InductionVisitor")(expr->typeStr())(expr);
+  if(expr->type() != EXPR_CHAIN || expr->partsNumber()==1) {
+    //We don't care about this
+    return;
+  }
+  
+  if(expr->partsNumber()==2) {
+    if(expr->part(0)->isLeaf("++")) {
+      //Case: ++i
+      increaseCount(expr->part(1)->str(), '+', expr->toString());
+      
+      return;
+    }
+    else if(expr->part(1)->isLeaf("++")) {
+      //Case: i++
+      increaseCount(expr->part(0)->str(), '+', expr->toString());
+      return;
+    }
+    else if(expr->part(0)->isLeaf("--")) {
+      //Case: --i
+      increaseCount(expr->part(1)->str(), '-', expr->toString());
+      
+      return;
+    }
+    else if(expr->part(1)->isLeaf("--")) {
+      //Case: i++
+      increaseCount(expr->part(0)->str(), '-', expr->toString());
+      return;
+    }
+  }
+  else if (expr->partsNumber()>=3) {
+    if ( ! expr->isAssignment()) {
+      //No assignment here: no induction variable
+      return;
+    }
+    
+    if (expr->getLHS().partsNumber() != 1) {
+      //This is not an assignment to a single variable (maybe to a cell of a matrix?)
+      return;
+    }
+    
+    if((expr->part(2)->str() == expr->part(0)->str() || expr->part(4)->str() == expr->part(0)->str())) {
+      if (expr->part(3)->isLeaf("+")) {
+        //Case: i = i + y
+        //Case: i = y + i
+        increaseCount(expr->part(0)->str(), '+', expr->toString());
+        return;
+      }
+      else if (expr->part(3)->isLeaf("-")) {
+        //Case: i = i - y
+        //Case: i = y - i
+        increaseCount(expr->part(0)->str(), '-', expr->toString());
+        return;
+      }
+    }
+  }
+  
+  JWARNING(false && "InductionVariableIdentifier - Should handle this case better")(expr->typeStr())(expr);
+  abort();
+}

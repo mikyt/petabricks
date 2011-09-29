@@ -40,6 +40,8 @@ class CodeGenerator;
 class RuleInterface;
 class Transform;
 
+typedef std::vector<RIRNodeRef> NodeStack;
+
 class RIRCompilerPass : public RIRVisitor {
 protected:
   template<typename T> class Context {
@@ -115,6 +117,15 @@ public:
 
   virtual void beforeAny(const RIRNodeRef&){}
   virtual void afterAny(const RIRNodeRef&){}
+  
+  ///Return the node the compiler pass is currently working on
+  RIRNodeRef& currentNode() { return _stack[_stack.size()-1]; }
+  const RIRNodeRef& currentNode() const { return _stack[_stack.size()-1]; }
+  
+  ///Return the parent of the given node
+  RIRNodeRef parentNode(const RIRNodeRef& node);
+  const RIRNodeRef parentNode(const RIRNodeRef& node) const;
+  
 protected:
   int depth() const { return _stack.size(); } 
 
@@ -177,7 +188,7 @@ private:
     _exprCtx.pop_back();
   }
 protected:
-  std::vector<RIRNodeRef>_stack;
+  NodeStack _stack;
   ExprContextStack _exprCtx;
   StmtContextStack _stmtCtx;
   RIRScopePtr      _scope;

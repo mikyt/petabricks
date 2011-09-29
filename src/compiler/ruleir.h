@@ -196,6 +196,31 @@ public:
     while(n-->0) ++i;
     return *i;
   }
+  
+  ///Return the number of subparts the expression is made of
+  size_t partsNumber() const {return _parts.size(); }
+  
+  ///If the expression is a comparison, returns the comparison operator
+  std::string getComparisonOp() const;
+  
+  ///Return true if the expression is an assignment
+  bool isAssignment() const { return containsLeaf("="); }
+  
+  ///Return true if the expression is a comparison
+  bool isComparison() const { return getComparisonOp() != ""; }
+  
+  ///Return true if the expression contains a boolean operator
+  bool containsBoolOp() const;
+  
+  ///Return true if the expression contains a ternary operator
+  bool containsTernaryOp() const { return containsLeaf("?"); }
+  
+  ///Return the Left Hand Side of an assigment expression
+  RIRExpr getLHS(std::string splitToken = "=") const;
+  
+  ///Return the Right Hand Side of an assignment expression
+  RIRExpr getRHS(std::string splitToken = "=") const;
+  
 protected:
   std::string _str;
   RIRExprList _parts;
@@ -272,6 +297,69 @@ public:
 };
 
 class RIRLoopStmt: public RIRControlStmt{
+  class InductionVariableIdentifier : public RIRVisitor, public jalib::SrcPosTaggable {
+    struct IndVarCandidate {
+      unsigned int count;
+      char iterationDirection;
+      std::string inductionIncrement;
+    };
+    typedef std::map <std::string, IndVarCandidate> CounterMap;
+    
+  public:
+    InductionVariableIdentifier () : _iterationDirection('\0'), _inductionVariable(""), _inductionIncrement("") {}
+    
+    std::string getInductionVariableFromBody(RIRLoopStmt& loop) {
+      if (_iterationDirection == '\0') {
+        computeInductionVariableAndIterationDirectionFromBody(loop);
+      }
+      return _inductionVariable;
+    }
+    
+    char getIterationDirectionFromBody(RIRLoopStmt& loop) {
+      if (_iterationDirection == '\0') {
+        computeInductionVariableAndIterationDirectionFromBody(loop);
+      }
+      return _iterationDirection;
+    }
+    
+    std::string getInductionIncrementFromBody(RIRLoopStmt& loop) {
+      if (_iterationDirection == '\0') {
+        computeInductionVariableAndIterationDirectionFromBody(loop);
+      }
+      return _inductionIncrement;
+    }
+  
+  private: //Methods
+    virtual void before(RIRExprCopyRef&);
+    
+    void computeInductionVariableAndIterationDirectionFromBody(RIRLoopStmt& loop);
+    
+    ///Record a new assignment for a given variable
+    void increaseCount (std::string variableName, char iterationDirection, std::string inductionIncrement) {
+      CounterMap::iterator varIt;
+      if((varIt = _variableAssignmentNumber.find(variableName)) != _variableAssignmentNumber.end()) {
+        //Previously assigned variable
+        varIt->second.count ++;
+        varIt->second.iterationDirection = iterationDirection;
+        varIt->second.inductionIncrement = inductionIncrement;
+      }
+      else {
+        //New variable
+        IndVarCandidate& var = _variableAssignmentNumber[variableName];
+        var.count = 1;
+        var.iterationDirection = iterationDirection;
+        var.inductionIncrement = inductionIncrement;
+      }
+    }
+    
+  private:
+    CounterMap _variableAssignmentNumber;
+    
+    //Cached results
+    char _iterationDirection;
+    std::string _inductionVariable;
+    std::string _inductionIncrement;
+  };
 public:
   RIRLoopStmt(const RIRStmtCopyRef& p) : RIRControlStmt(STMT_LOOP) { _body=p; }
   void print(std::ostream& o, RIRVisitor* printVisitor);
@@ -301,8 +389,65 @@ public:
     addExpr(max);
     return this;
   }
+  
+  ///Get the name of the variable limiting the iteration of the loop (if any)
+  std::string getLimit ();
+  
+  ///Get the name of the induction variable of the loop
+  std::string getInductionVariable() {  if( ! isCacheValid()) {
+                                          computeInductionVariable();
+                                        }
+                                        return _inductionVariable;
+                                     }
+  
+  ///Get the direction of the iteration
+  /// "+" if the induction variable is increased
+  /// "-" if the induction variable is decreased
+  char getIterationDirection() {  if( ! isCacheValid()) {
+                                    computeInductionVariable();
+                                  }
+                                  return _iterationDirection; 
+                               }
+                               
+  std::string getInductionIncrement() { if( ! isCacheValid()) {
+                                          computeInductionVariable();
+                                        }
+                                        return _inductionIncrement;
+                                      }
+  
+  ///Make the loop increment part empty
+  void clearIncPart() { 
+    invalidateCache();
+    incPart() = new RIRNilExpr(); 
+  }
+  
+  ///Make the loop initialization part empty
+  void clearDeclPart() { 
+    invalidateCache();
+    declPart() = new RIRNilExpr(); 
+  }
+  
+private: //Methods
+  ///Compute the induction variable. Also, store the iteration direction and the
+  ///induction increment expression
+  void computeInductionVariable();
+  
+  void computeInductionVariableFromIncrement();
+  void computeInductionVariableFromBody();
+  
+  ///Are the cached attributes valid?
+  bool isCacheValid() const { return _iterationDirection != '\0'; }
+  
+  ///Mark the cached attributes as invalid
+  void invalidateCache() { _iterationDirection = '\0'; }
+  
 private:
   RIRStmtCopyRef _body;
+  
+  //Cached attributes
+  std::string _inductionVariable;
+  char _iterationDirection;
+  std::string _inductionIncrement;
 };
 
 class RIRSwitchStmt: public RIRControlStmt{

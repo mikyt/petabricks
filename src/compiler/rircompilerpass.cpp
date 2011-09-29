@@ -39,6 +39,30 @@ namespace {//file local
   }
 }
 
+const petabricks::RIRNodeRef petabricks::RIRCompilerPass::parentNode(const RIRNodeRef& node) const {
+  RIRNodeRef parent = RIRNodeRef();
+  for(NodeStack::const_iterator i=_stack.begin(), e=_stack.end(); i!=e; ++i) {
+    if(*i == node) {
+      return parent;
+    }
+    parent = (*i);
+  }
+  return RIRNodeRef(NULL);
+}
+
+
+
+petabricks::RIRNodeRef petabricks::RIRCompilerPass::parentNode(const RIRNodeRef& node) {
+  RIRNodeRef parent = RIRNodeRef();
+  for(NodeStack::iterator i=_stack.begin(), e=_stack.end(); i!=e; ++i) {
+    if(*i == node) {
+      return parent;
+    }
+    parent = (*i);
+  }
+  return RIRNodeRef(NULL);
+}
+
 void petabricks::GpuRenamePass::before(RIRExprCopyRef& e)
 {
   if( RIRNode::EXPR_IDENT == e->type() )
