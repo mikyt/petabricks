@@ -595,3 +595,7 @@ void petabricks::RIRLoopStmt::InductionVariableIdentifier::before(RIRExprCopyRef
   JWARNING(false && "InductionVariableIdentifier - Should handle this case better")(expr->typeStr())(expr);
   abort();
 }
+
+unsigned int petabricks::RIRBlockStmt::opsNumber() const { 
+    return _block->opsNumber();
+}
