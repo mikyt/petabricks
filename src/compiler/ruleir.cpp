@@ -576,6 +576,12 @@ void petabricks::RIRLoopStmt::InductionVariableIdentifier::before(RIRExprCopyRef
       return;
     }
     
+    if ( ! expr->getRHS().containsLeaf("+") || ! expr->getRHS().containsLeaf("-")) {
+      //No variable is incremented/decremented. This is just a copy of a value.
+      //No induction variable here
+      return;
+    }
+    
     if((expr->part(2)->str() == expr->part(0)->str() || expr->part(4)->str() == expr->part(0)->str())) {
       if (expr->part(3)->isLeaf("+")) {
         //Case: i = i + y
