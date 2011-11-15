@@ -8,7 +8,6 @@ flex
 g++
 git-core
 graphviz
-install
 libblas-dev
 libboost-all-dev
 libboost-dev
@@ -21,4 +20,5 @@ python-numpy
 python-ply
 python-scientific
 python-scipy
+libsqlite3-dev
 libsqlite3-dev
