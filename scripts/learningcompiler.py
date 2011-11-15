@@ -21,14 +21,23 @@ conf_deleteTempDir = True
 conf_minTrialNumber = 10
 conf_probabilityExploration = 0.7
 conf_pickBestN = 3
-#--------- Autotuner config --------
-config.max_time=30 #Seconds
-#-----------------------------------
+conf_timeout = 5*60
+conf_heuristicsFileName = "heuristics.txt"
+conf_maxTime = 10 #Seconds
 
-
-
-
-
+class FailedCandidate:
+  """Represents a candidate that failed during compilation or tuning"""
+  def __init__(self, heuristicSet=None):
+    if heuristicSet is None:
+      self.heuristicSet = HeuristicSet()
+    else:
+      self.heuristicSet = heuristicSet
+      
+    self.originalIndex=None
+    self.failed = True
+  
+  
+    
 class HeuristicDB:
   def __init__(self):
     #Open DB    
@@ -102,7 +111,7 @@ class HeuristicDB:
     self.__db.commit()
   
   def increaseScore(self, hSet, score):
-    """Mark a set of heuristics as selected as the best one for an executable"""
+    """Increase the score of a set of heuristics by the given amount"""
     #TODO: also store it as a set
     for name, formula in hSet.iteritems():
       self.increaseHeuristicScore(name, formula, score)
@@ -232,7 +241,7 @@ def candidateKey(candidate):
   """Generates a comparison key for a candidate.
 Candidates are sorted by the number of dimensions (the highest, the better),
 then by average execution time of the biggest dimension (the lower the better)"""
-  if candidate is None:
+  if candidate.failed:
     return (float('inf'), float('inf'))
   numDimensions = len(candidate.metrics[0])
   executionTime = candidate.metrics[0][2**(numDimensions-1)].mean()
@@ -244,8 +253,6 @@ class CandidateList(list):
   def addOriginalIndex(self):
     count = 0
     for candidate in self:
-      if candidate is None:
-        continue
       candidate.originalIndex = count;
       count = count + 1
       
@@ -276,24 +283,37 @@ with the originalIndex field added"""
     numCandidates = len(candidates)
     count=0
     for candidate in candidates:
-      infoFile=os.path.join(basesubdir, 
-                            str(candidate.originalIndex), 
-                            basename+".info")
-    
-      score = (numCandidates - count) / float(numCandidates)
+      if not candidate.failed:
+	infoFile=os.path.join(basesubdir, 
+			      str(candidate.originalIndex), 
+			      basename+".info")
       
-       #Take the data about the used heuristics scores and store it into the DB
-      infoxml = xml.dom.minidom.parse(infoFile)
-      hSet = HeuristicSet()
-      hSet.importFromXml(infoxml)
-      self.__db.increaseScore(hSet, score)
-      self.__db.markAsUsed(hSet)
-      
+	score = (numCandidates - count) / float(numCandidates)
+	
+	#Take the data about the used heuristics scores and store it into the DB
+	infoxml = xml.dom.minidom.parse(infoFile)
+	hSet = HeuristicSet()
+	hSet.importFromXml(infoxml)
+	self.__db.increaseScore(hSet, score)
+	self.__db.markAsUsed(hSet)
+      else:
+	#Compilation has failed!
+	#Take the data about the heuristics from the input heuristics file
+	#instead of the info file (because there no such file!). 
+	#We are not sure that all the heuristics in the input
+	#file have been used, but they had the compilation fail.
+	#Their score is not increased, but they are marked as used
+	#(and therefore they are penalized)
+	self.__db.markAsUsed(candidate.heuristicSet)
+	
       count = count +1
       
     
     
   def compileLearningHeuristics(self, benchmark, finalBinary=None):
+    #Define the time to spend autotuning each candidate
+    config.max_time= conf_maxTime
+    
     #Define file names
     path, basenameExt = os.path.split(benchmark)
     if path == "":
@@ -311,14 +331,20 @@ with the originalIndex field added"""
     binary= os.path.join(outDir, basename)  
     status=pbutil.compileBenchmark(self.__pbcExe, benchmark, binary=binary, jobs=self.__jobs)  
     if status != 0:
+      print "Compile FAILED with current best heuristics - Compilation aborted"
       return status
       
     try:
       autotune(binary, candidates)
+      
+      #Candidate has not failed: mark as such
+      currentCandidate = candidates[-1]
+      currentCandidate.failed = False
+      
     except tunerwarnings.AlwaysCrashes:
         print "Current best Candidate always crashes!"
         #Add an empty entry for the candidate
-        candidates.append(None)
+        candidates.append(FailedCandidate())
     
     #Get the full set of heuristics used
     infoFile=binary+".info"
@@ -334,9 +360,11 @@ with the originalIndex field added"""
     numSets = len(allHSets)
     
     
-    count=1
+    count=0
+    successfulCompilations=1 #The first compilation has already been done
     for hSet in allHSets:
       hSet.complete(neededHeuristics, self.__db, conf_pickBestN)
+      count = count + 1
       
       #Define more file names
       outDir = os.path.join(basesubdir, str(count))
@@ -345,25 +373,31 @@ with the originalIndex field added"""
         os.makedirs(outDir)
       binary= os.path.join(outDir, basename)  
       
-      heuristicsFile= os.path.join(outDir, "heuristics.txt")
+      heuristicsFile= os.path.join(outDir, conf_heuristicsFileName)
       hSet.toXmlFile(heuristicsFile)
       
-      status = pbutil.compileBenchmark(self.__pbcExe, benchmark, binary=binary, heuristics=heuristicsFile, jobs=self.__jobs)
+      status = pbutil.compileBenchmark(self.__pbcExe, benchmark, binary=binary, heuristics=heuristicsFile, jobs=self.__jobs, timeout=conf_timeout)
       if status != 0:
-        print "Compile FAILED"
-        print "while using heuristics: "
+        print "Compile FAILED while using heuristic set #"+str(count)+": ",
         print hSet
-        return status
+        #Add an empty entry for the candidate
+        candidates.append(FailedCandidate(hSet))
+        #Go to next heuristic set
+        continue
       
       #Autotune
       try:
         autotune(binary, candidates)
+        
+        #Candidate has not failed: mark as such
+	currentCandidate = candidates[-1]
+	currentCandidate.failed = False
       except tunerwarnings.AlwaysCrashes:
         print "Candidate "+str(count)+" always crashes!"
         #Add an empty entry for the candidate
-        candidates.append(None)
+        candidates.append(FailedCandidate(hSet))
       
-      count = count + 1
+      
       
     candidates.addOriginalIndex()
     candidates.sortBySpeed()
@@ -402,7 +436,7 @@ with the originalIndex field added"""
     shutil.move(bestObjDir, destObjDir)
     #  input heuristic file
     if bestIndex != 0: #Program 0 is run with only the best heuristics in the DB
-      bestHeurFile=os.path.join(bestSubDir, "heuristics.txt")
+      bestHeurFile=os.path.join(bestSubDir, conf_heuristicsFileName )
       finalHeurFile=finalBin+".heur"
       shutil.move(bestHeurFile, finalHeurFile)
     
