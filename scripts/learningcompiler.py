@@ -18,7 +18,7 @@ from tunerconfig import config
 
 #--------- Config ------------------
 conf_deleteTempDir = True
-conf_minTrialNumber = 10
+conf_minTrialNumber = 6
 conf_probabilityExploration = 0.7
 conf_pickBestN = 3
 conf_timeout = 5*60
@@ -336,15 +336,15 @@ with the originalIndex field added"""
     #Init variables
     candidates=CandidateList()
     
-    #Compile with current best heuristics
+    #Compile with default heuristics
     outDir = os.path.join(basesubdir, "0")
     if not os.path.isdir(outDir):
       #Create the output directory
       os.makedirs(outDir)
     binary= os.path.join(outDir, basename)  
-    status=pbutil.compileBenchmark(self.__pbcExe, benchmark, binary=binary, jobs=self.__jobs)  
+    status=pbutil.compileBenchmark(self.__pbcExe, benchmark, binary=binary, jobs=self.__jobs, defaultHeuristics=True)  
     if status != 0:
-      print "Compile FAILED with current best heuristics - Compilation aborted"
+      print "Compile FAILED with default heuristics - Compilation aborted"
       return status
       
     try:
