@@ -18,7 +18,7 @@ from tunerconfig import config
 
 #--------- Config ------------------
 conf_deleteTempDir = True
-conf_minTrialNumber = 10
+conf_minTrialNumber = 6
 conf_probabilityExploration = 0.7
 conf_pickBestN = 3
 conf_timeout = 5*60
@@ -27,14 +27,15 @@ conf_maxTime = 10 #Seconds
 
 class FailedCandidate:
   """Represents a candidate that failed during compilation or tuning"""
-  def __init__(self, heuristicSet=None):
+  def __init__(self, heuristicSet=None, compilationFailed=True):
     if heuristicSet is None:
       self.heuristicSet = HeuristicSet()
     else:
       self.heuristicSet = heuristicSet
-      
+    
     self.originalIndex=None
     self.failed = True
+    self.compilationFailed=compilationFailed
   
   
     
@@ -46,11 +47,23 @@ class HeuristicDB:
     except:
       self.__db = sqlite3.connect(":memory:")
     self.__createTables()
+    self.__createView("HeuristicsRank", 
+		      "SELECT *, "
+		      "Heuristic.score/Heuristic.useCount as finalScore "
+		      "FROM Heuristic "
+		      "ORDER BY Heuristic.score/Heuristic.useCount")
     self.__bestNCache= dict()
     
   def __createTable(self, name, params):
     cur = self.__db.cursor()
     query = "CREATE TABLE IF NOT EXISTS '"+name+"' "+params
+    cur.execute(query)
+    cur.close()
+    self.__db.commit()
+    
+  def __createView(self, name, params):
+    cur = self.__db.cursor()
+    query = "CREATE VIEW IF NOT EXISTS '"+name+"' AS "+params
     cur.execute(query)
     cur.close()
     self.__db.commit()
@@ -283,7 +296,7 @@ with the originalIndex field added"""
     numCandidates = len(candidates)
     count=0
     for candidate in candidates:
-      if not candidate.failed:
+      if not candidate.compilationFailed:
 	infoFile=os.path.join(basesubdir, 
 			      str(candidate.originalIndex), 
 			      basename+".info")
@@ -340,6 +353,7 @@ with the originalIndex field added"""
       #Candidate has not failed: mark as such
       currentCandidate = candidates[-1]
       currentCandidate.failed = False
+      currentCandidate.compilationFailed = False
       
     except tunerwarnings.AlwaysCrashes:
         print "Current best Candidate always crashes!"
@@ -392,10 +406,11 @@ with the originalIndex field added"""
         #Candidate has not failed: mark as such
 	currentCandidate = candidates[-1]
 	currentCandidate.failed = False
+	currentCandidate.compilationFailed = False
       except tunerwarnings.AlwaysCrashes:
         print "Candidate "+str(count)+" always crashes!"
         #Add an empty entry for the candidate
-        candidates.append(FailedCandidate(hSet))
+        candidates.append(FailedCandidate(hSet, compilationFailed=False))
       
       
       
