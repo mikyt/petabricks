@@ -259,14 +259,14 @@ std::string petabricks::RIRLoopStmt::getLimit() {
   
   JASSERT(test->isComparison())(test);
   std::string compOp = test->getComparisonOp();
-  RIRExpr LHS = test->getLHS(compOp);
-  RIRExpr RHS = test->getRHS(compOp);
+  RIRExprCopyRef LHS = test->getLHS(compOp);
+  RIRExprCopyRef RHS = test->getRHS(compOp);
           
-  if(LHS.toString() == inductionVar) {
-    return RHS.toString();
+  if(LHS->toString() == inductionVar) {
+    return RHS->toString();
   }
-  else if(RHS.toString() == inductionVar) {
-    return LHS.toString();
+  else if(RHS->toString() == inductionVar) {
+    return LHS->toString();
   }
   
   UNIMPLEMENTED();
@@ -292,8 +292,14 @@ void petabricks::RIRLoopStmt::computeInductionVariable() {
 
 ///Returns the name of the induction variable or "" if it is impossible to find it here
 ///It also sets the iteration direction of the found induction variable ('\0' if not found)
-void petabricks::RIRLoopStmt::computeInductionVariableFromIncrement() {
-  RIRExprCopyRef& increment = incPart();
+void petabricks::RIRLoopStmt::computeInductionVariableFromIncrement(RIRExprCopyRef increment) {
+  if(increment->containsLeaf(",")) {
+    /* The increment part contains multiple expressions. 
+     * Recursively look for the induction variable in all of them */
+    computeInductionVariableFromIncrement(increment->getLHS(","));
+    computeInductionVariableFromIncrement(increment->getRHS(","));
+    return;
+  }
   
   if(increment->partsNumber() == 2) {
     RIRExprCopyRef const& part0 = increment->part(0);
@@ -409,17 +415,17 @@ bool petabricks::RIRExpr::containsBoolOp() const {
   return false;
 }
 
-petabricks::RIRExpr petabricks::RIRExpr::getLHS(std::string splitToken) const {
-  JASSERT(isAssignment() || isComparison());
+petabricks::RIRExprCopyRef petabricks::RIRExpr::getLHS(std::string splitToken) const {
+  JASSERT(isAssignment() || isComparison() || containsLeaf(","));
   
-  RIRExpr lhs(EXPR_CHAIN);
+  RIRExprCopyRef lhs(new RIRExpr(EXPR_CHAIN));
   
   for(RIRExprList::const_iterator i=_parts.begin(), e=_parts.end(); i!=e; ++i) {
     if((*i)->isLeaf(splitToken.c_str())) {
       return lhs;
     }
     
-    lhs.addSubExpr(*i);
+    lhs->addSubExpr(*i);
   }
   
   //Should never reach here: is the expression really an assigment?
@@ -428,10 +434,10 @@ petabricks::RIRExpr petabricks::RIRExpr::getLHS(std::string splitToken) const {
 
 
 
-petabricks::RIRExpr petabricks::RIRExpr::getRHS(std::string splitToken) const {
-  JASSERT(isAssignment() || isComparison());
+petabricks::RIRExprCopyRef petabricks::RIRExpr::getRHS(std::string splitToken) const {
+  JASSERT(isAssignment() || isComparison() || containsLeaf(","));
   
-  RIRExpr rhs(EXPR_CHAIN);
+  RIRExprCopyRef rhs(new RIRExpr(EXPR_CHAIN));
   
   ///Reach the "=" sign
   RIRExprList::const_iterator i;
@@ -441,7 +447,7 @@ petabricks::RIRExpr petabricks::RIRExpr::getRHS(std::string splitToken) const {
   ++i;
   
   for(RIRExprList::const_iterator e=_parts.end(); i!=e; ++i) {
-    rhs.addSubExpr(*i);
+    rhs->addSubExpr(*i);
   }
   
   return rhs;
@@ -571,12 +577,12 @@ void petabricks::RIRLoopStmt::InductionVariableIdentifier::before(RIRExprCopyRef
       return;
     }
     
-    if (expr->getLHS().partsNumber() != 1) {
+    if (expr->getLHS()->partsNumber() != 1) {
       //This is not an assignment to a single variable (maybe to a cell of a matrix?)
       return;
     }
     
-    if ( ! expr->getRHS().containsLeaf("+") || ! expr->getRHS().containsLeaf("-")) {
+    if ( ! expr->getRHS()->containsLeaf("+") || ! expr->getRHS()->containsLeaf("-")) {
       //No variable is incremented/decremented. This is just a copy of a value.
       //No induction variable here
       return;

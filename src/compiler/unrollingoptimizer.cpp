@@ -89,10 +89,10 @@ bool petabricks::UnrollingOptimizer::shouldUnroll(RIRLoopStmt& loop) {
   
   if(loopCondition->isComparison()) {
     std::string compOp = loopCondition->getComparisonOp();
-    RIRExpr const& LHS = loopCondition->getLHS(compOp);
-    RIRExpr const& RHS = loopCondition->getRHS(compOp);
+    RIRExprCopyRef LHS = loopCondition->getLHS(compOp);
+    RIRExprCopyRef RHS = loopCondition->getRHS(compOp);
     
-    if(LHS.toString() == inductionVar || RHS.toString() == inductionVar) {
+    if(LHS->toString() == inductionVar || RHS->toString() == inductionVar) {
       //It's a direct comparison with the induction variable. Let's unroll!
       return true;
     }

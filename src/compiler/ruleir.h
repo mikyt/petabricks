@@ -221,10 +221,10 @@ public:
   bool containsTernaryOp() const { return containsLeaf("?"); }
   
   ///Return the Left Hand Side of an assigment expression
-  RIRExpr getLHS(std::string splitToken = "=") const;
+  RIRExprCopyRef getLHS(std::string splitToken = "=") const;
   
   ///Return the Right Hand Side of an assignment expression
-  RIRExpr getRHS(std::string splitToken = "=") const;
+  RIRExprCopyRef getRHS(std::string splitToken = "=") const;
   
   virtual unsigned int opsNumber() const {
     if(type()==EXPR_OP) {
@@ -466,7 +466,11 @@ private: //Methods
   ///induction increment expression
   void computeInductionVariable();
   
-  void computeInductionVariableFromIncrement();
+  void computeInductionVariableFromIncrement() {
+                              computeInductionVariableFromIncrement(incPart());
+                            }
+  
+  void computeInductionVariableFromIncrement(RIRExprCopyRef increment);
   void computeInductionVariableFromBody();
   
   ///Are the cached attributes valid?
