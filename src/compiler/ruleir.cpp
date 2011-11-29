@@ -246,7 +246,6 @@ petabricks::RIRExprCopyRef& petabricks::RIRStmt::part(int n) {
   return *i;
 }
 
-
 std::string petabricks::RIRLoopStmt::getLimit() {
   std::string inductionVar = getInductionVariable();
   
