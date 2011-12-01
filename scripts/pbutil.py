@@ -13,17 +13,18 @@ import subprocess
 import sys
 import time
 import traceback
+import learningcompiler
 from xml.dom.minidom import parse,parseString
 from xml.dom import DOMException
 from pprint import pprint
 from configtool import getConfigVal, setConfigVal
-from learningcompiler import LearningCompiler
-from threading import Thread
+from pbutil_support import compileBenchmark
 
 try:
   import numpy
 except:
   sys.stderr.write("failed to import numpy\n")
+
 
 #return number of cpus online
 def cpuCount():
@@ -283,70 +284,6 @@ def normalizeBenchmarkName(orig, search=True):
       if orig is not None:
         return orig
       raise
-
-def killSubprocess(p):
-  if p.poll() is None:
-    try:
-      p.kill() #requires python 2.6
-    except:
-      os.kill(p.pid, signal.SIGKILL)
-      
-def terminateSubprocess(p):
-  if p.poll() is None:
-    try:
-      p.terminate() #requires python 2.6
-    except:
-      os.kill(p.pid, signal.SIGTERM)
-
-      
-def timeoutKiller(subproc, timeout):
-  """Kill the 'subproc' process after 'timeout' seconds"""
-  
-  endTime = time.time()+timeout
-  
-  while (subproc.poll() is None) and (time.time() < endTime):
-      time.sleep(5)
-  
-  terminateSubprocess(subproc)
-    
-
-
-def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=None, timeout=None, defaultHeuristics=False):
-    if not os.path.isfile(src):
-      raise IOError()
-    
-    #Build the command
-    cmd=[pbc]
-    
-    if binary is not None:
-      cmd.append("--output="+binary)
-    if info is not None:
-      cmd.append("--outputinfo="+info)
-    if jobs is not None:
-      cmd.append("--jobs="+str(jobs))
-    if heuristics is not None:
-      cmd.append("--heuristics="+heuristics)
-    if defaultHeuristics:
-      cmd.append("--defaultheuristics")
-    
-    cmd.append(src)
-    
-    #Remove the output file (if it exists)
-    if os.path.isfile(binary):
-      os.unlink(binary)
-      
-    #Execute the compiler
-    p = subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
-    
-    if timeout is not None:
-      #Start the timeout
-      killerThread = Thread(target=timeoutKiller, args=(p, timeout))
-      killerThread.start()
-    
-    #Wait for the compiler to finish executing
-    status = p.wait()
-    
-    return status
   
   
 def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None):
@@ -359,7 +296,7 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None):
     jobs_per_pbc = cpuCount()
   else:
     jobs_per_pbc=max(1, 2*cpuCount() / len(benchmarks))
-  compiler = LearningCompiler(pbc, heuristicSetFileName, jobs=jobs_per_pbc)
+  compiler = learningcompiler.LearningCompiler(pbc, heuristicSetFileName, jobs=jobs_per_pbc)
 
   def innerCompileBenchmark(name):
     print name.ljust(benchmarkMaxLen)

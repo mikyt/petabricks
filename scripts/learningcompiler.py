@@ -6,12 +6,12 @@ Michele Tartara <mikyt@users.sourceforge.net>"""
 
 import learningframework
 import os
-import pbutil
+import pbutil_support
 import tunerwarnings
 import shutil
 import sys
 from tunerconfig import config
-from sgatuner import autotune
+import sgatuner
 from candidatetester import Candidate
 
 #------------------ Config --------------------
@@ -79,7 +79,7 @@ following attributes:
     heuristicsFile= os.path.join(outDir, CONF_HEURISTIC_FILE_NAME)
     hSet.toXmlFile(heuristicsFile)
     
-    status = pbutil.compileBenchmark(self._pbcExe, 
+    status = pbutil_support.compileBenchmark(self._pbcExe, 
                                      benchmark, 
                                      binary = binary, 
                                      heuristics = heuristicsFile, 
@@ -100,7 +100,7 @@ following attributes:
         
     #Autotune
     try:
-      autotune(binary, candidates)
+      sgatuner.autotune(binary, candidates)
       
       #Candidate has not failed: mark as such
       candidate = candidates[-1]
@@ -143,7 +143,7 @@ following attributes:
       #Create the output directory
       os.makedirs(outDir)
     binary= os.path.join(outDir, basename)  
-    status = pbutil.compileBenchmark(self._pbcExe, 
+    status = pbutil_support.compileBenchmark(self._pbcExe, 
                                    benchmark, 
                                    binary = binary, 
                                    jobs = self._jobs, 
@@ -153,7 +153,7 @@ following attributes:
       return status
       
     try:
-      autotune(binary, candidates)
+      sgatuner.autotune(binary, candidates)
       
       #Candidate has not failed: mark as such
       currentCandidate = candidates[-1]
