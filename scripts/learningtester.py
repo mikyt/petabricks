@@ -41,6 +41,8 @@ def parseCmdline(petabricks_path):
 
 
 def testLearning(pbc, testProgram, testBinary, n, trials):
+  """Tests the effects of learning, by compiling the benchmark with the current
+best heuristics, then executing it and fetching the average timing result"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
   
   res=pbutil.executeTimingRun(testBinary, n, args=[], limit=CONF_TIMEOUT, trials=trials)
