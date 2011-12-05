@@ -14,7 +14,7 @@ from optparse import OptionParser
 CONF_TIMEOUT=5*60
 
 def parseCmdline(petabricks_path):
-  parser = OptionParser(usage="usage: learningtester.py [options]")
+  parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
   parser.add_option("--heuristics", 
                 type="string", 
                 help="name of the file containing the set of heuristics to use", 
@@ -56,6 +56,10 @@ def main():
   
   (options, args) = parseCmdline(petabricks_path)
   
+  if len(args)==0:
+    print "No test program specified"
+    exit(-1)
+  
   testProgram=os.path.abspath(args[0])
   testBinary = os.path.splitext(testProgram)[0]
   
@@ -71,7 +75,11 @@ def main():
   
   trainingset = open(options.trainingset, "r")
   for line in trainingset:
-    trainingprogram=line.strip(" \n")
+    trainingprogram=line.strip(" \n\t")
+    if trainingprogram[0]=="#":
+      #Comment
+      continue
+    
     program=os.path.join(examples_path, trainingprogram)
     src=program+".pbcc"
     binary=program
