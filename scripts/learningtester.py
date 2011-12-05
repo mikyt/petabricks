@@ -31,6 +31,11 @@ def parseCmdline(petabricks_path):
 		    type="int",
 		    help="number of executions of the test program for averaging the result",
 		    default=1)
+  parser.add_option("--resultfile",
+		    type="string",
+		    help="file containing the results in gnuplot-compatible format",
+		    default="training-results.dat")
+		    
   return parser.parse_args()
 
 
@@ -44,7 +49,7 @@ def testLearning(pbc, testProgram, testBinary, n, trials):
   return avg
   
   
-  
+
   
 def main():
   """The body of the program"""
@@ -68,12 +73,12 @@ def main():
   
   examples_path= os.path.join(petabricks_path, "examples")
   
-  results=[]
+  trainingset = open(options.trainingset, "r")
+  resultfile = open(options.resultfile, "w")
   
   print "Compiling and testing the initial version of the test program"
-  results.append(("INITIAL", testLearning(pbc, testProgram, testBinary, options.n, options.trials)))
+  resultfile.write(""""INITIAL" %s\n""" % testLearning(pbc, testProgram, testBinary, options.n, options.trials))
   
-  trainingset = open(options.trainingset, "r")
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
     if trainingprogram[0]=="#":
@@ -85,17 +90,17 @@ def main():
     binary=program
     
     print "Learning from "+trainingprogram
-    print "Src: "+src
-    print "binary: "+binary
     compiler.compileLearningHeuristics(src, binary)
     
     print "Compiling and testing the test program"
     res=testLearning(pbc, testProgram, testBinary, options.n, options.trials)
     
-    results.append((trainingprogram, res))
-
-  print results
+    resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
+    resultfile.flush()
   
+  print "Results written to " + options.resultfile
+
+
   
 if __name__ == "__main__":
   main()
