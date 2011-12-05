@@ -87,11 +87,17 @@ def main():
     print "Learning from "+trainingprogram
     print "Src: "+src
     print "binary: "+binary
-    compiler.compileLearningHeuristics(src, binary)
     
-    print "Compiling and testing the test program"
-    res=testLearning(pbc, testProgram, testBinary, options.n, options.trials)
-    
+    try:
+      compiler.compileLearningHeuristics(src, binary)
+      print "Compiling and testing the test program"
+      res=testLearning(pbc, testProgram, testBinary, options.n, options.trials)
+    except Exception as e:
+      sys.stderr.write("Irrecoverable error while learning:\n")
+      print e
+
+      res=-1
+
     results.append((trainingprogram, res))
 
   print results
