@@ -470,8 +470,8 @@ def executeRaceRun(_cmd, configa, configb, retries=3):
   return aresult, bresult
 
 #parse timing results with a given time limit
-def executeTimingRun(prog, n, args=[], limit=None, returnTags='timing'):
-  cmd = [ prog, "--n=%d"%n, "--time" ]
+def executeTimingRun(prog, n, args=[], limit=None, returnTags='timing', trials=1):
+  cmd = [ prog, "--n=%d"%n, "--time", "--trials=%d"%trials ]
   cmd.extend(args);
   if limit:
     cmd.append("--max-sec=%f" % float(limit))
