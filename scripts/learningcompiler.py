@@ -10,7 +10,6 @@ import pbutil_support
 import tunerwarnings
 import shutil
 import sys
-from tunerconfig import config, config_defaults
 import sgatuner
 from candidatetester import Candidate
 
@@ -46,11 +45,6 @@ class LearningCompiler:
     
     
   def compileLearningHeuristics(self, benchmark, finalBinary = None):
-    #Reset the tuner configuration
-    config.__dict__ = config_defaults.__dict__.copy()
-    #Define the time to spend autotuning each candidate
-    config.max_time = CONF_MAX_TIME
-    
     self._finalBinary = finalBinary
     self._neededHeuristics={}
     
@@ -103,7 +97,7 @@ following attributes:
         
     #Autotune
     try:
-      sgatuner.autotune(binary, candidates)
+      sgatuner.autotune_withparams(binary, candidates, max_time=CONF_MAX_TIME)
       
       #Candidate has not failed: mark as such
       candidate = candidates[-1]
@@ -156,7 +150,7 @@ following attributes:
       return status
       
     try:
-      sgatuner.autotune(binary, candidates)
+      sgatuner.autotune_withparams(binary, candidates, max_time=CONF_MAX_TIME)
       
       #Candidate has not failed: mark as such
       currentCandidate = candidates[-1]
