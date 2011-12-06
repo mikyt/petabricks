@@ -44,7 +44,7 @@ def testLearning(pbc, testProgram, testBinary, n, trials):
   """Tests the effects of learning, by compiling the benchmark with the current
 best heuristics, then executing it and fetching the average timing result"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
-  
+  #TODO: autotune
   res=pbutil.executeTimingRun(testBinary, n, args=[], limit=CONF_TIMEOUT, trials=trials)
   avg=res["average"]
   
@@ -83,8 +83,8 @@ def main():
   
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
-    if trainingprogram[0]=="#":
-      #Comment
+    if len(trainingprogram)==0 or trainingprogram[0]=="#":
+      #Comment or empty line
       continue
     
     program=os.path.join(examples_path, trainingprogram)
@@ -99,7 +99,7 @@ def main():
       res=testLearning(pbc, testProgram, testBinary, options.n, options.trials)
     except Exception as e:
       sys.stderr.write("Irrecoverable error while learning:\n")
-      print e
+      print sys.exc_info()
 
       res=-1
 
