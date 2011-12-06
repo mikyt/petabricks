@@ -8,6 +8,7 @@ import learningcompiler
 import os
 import sys
 import pbutil
+import sgatuner
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
@@ -27,10 +28,6 @@ def parseCmdline(petabricks_path):
                     type="int",
                     help="size of the input to generate for testing",
                     default=256)
-  parser.add_option("--trials",
-		    type="int",
-		    help="number of executions of the test program for averaging the result",
-		    default=1)
   parser.add_option("--resultfile",
 		    type="string",
 		    help="file containing the results in gnuplot-compatible format",
@@ -40,15 +37,20 @@ def parseCmdline(petabricks_path):
 
 
 
-def testLearning(pbc, testProgram, testBinary, n, trials):
+def testLearning(pbc, testProgram, testBinary, n):
   """Tests the effects of learning, by compiling the benchmark with the current
 best heuristics, then executing it and fetching the average timing result"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
-  #TODO: autotune
-  res=pbutil.executeTimingRun(testBinary, n, args=[], limit=CONF_TIMEOUT, trials=trials)
-  avg=res["average"]
   
-  return avg
+  candidates=[]
+  sgatuner.autotune_withparams(testBinary, candidates, n, CONF_TIMEOUT)
+  
+  candidate = candidates[0]
+  numDimensions = len(candidate.metrics[0])
+  maxDimension = 2**(numDimensions-1)
+  avgExecutionTime = candidate.metrics[0][maxDimension].mean()
+  
+  return avgExecutionTime
   
   
 
@@ -79,7 +81,7 @@ def main():
   resultfile = open(options.resultfile, "w")
   
   print "Compiling and testing the initial version of the test program"
-  resultfile.write(""""INITIAL" %s\n""" % testLearning(pbc, testProgram, testBinary, options.n, options.trials))
+  resultfile.write(""""INITIAL" %s\n""" % testLearning(pbc, testProgram, testBinary, options.n))
   
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
@@ -96,7 +98,7 @@ def main():
     try:
       compiler.compileLearningHeuristics(src, binary)
       print "Compiling and testing the test program"
-      res=testLearning(pbc, testProgram, testBinary, options.n, options.trials)
+      res=testLearning(pbc, testProgram, testBinary, options.n)
     except Exception as e:
       sys.stderr.write("Irrecoverable error while learning:\n")
       print sys.exc_info()
