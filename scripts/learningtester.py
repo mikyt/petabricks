@@ -49,7 +49,16 @@ best heuristics, then executing it and fetching the average timing result"""
   candidate = candidates[0]
   numDimensions = len(candidate.metrics[0])
   maxDimension = 2**(numDimensions-1)
-  avgExecutionTime = candidate.metrics[0][maxDimension].mean()
+  
+  if maxDimension == n:
+    #The tuning process already computed the average time of execution
+    #for the desired input size: use it!
+    avgExecutionTime = candidate.metrics[0][maxDimension].mean()
+  else:
+    #The tuning was interrupted by the timeout
+    #Explicitly compute the timing for the size we want
+    res=pbutil.executeTimingRun(testBinary, n, args=[], limit=CONF_TIMEOUT, trials=3)
+    avgExecutionTime=res["average"]
   
   return avgExecutionTime
   
