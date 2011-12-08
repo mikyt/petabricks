@@ -9,6 +9,7 @@ import os
 import sys
 import pbutil
 import sgatuner
+import traceback
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
@@ -101,8 +102,10 @@ def main():
       res=testLearning(pbc, testProgram, testBinary, options.n)
     except Exception as e:
       sys.stderr.write("Irrecoverable error while learning:\n")
-      print sys.exc_info()
-
+      einfo = sys.exc_info()
+      print einfo[0]
+      print einfo[1]
+      traceback.print_tb(einfo[2])
       res=-1
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
