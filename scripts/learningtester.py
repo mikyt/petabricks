@@ -91,7 +91,11 @@ def main():
   resultfile = open(options.resultfile, "w")
   
   print "Compiling and testing the initial version of the test program"
-  resultfile.write(""""INITIAL" %s\n""" % testLearning(pbc, testProgram, testBinary, options.n))
+  try:
+    res = testLearning(pbc, testProgram, testBinary, options.n)
+  except TimingRunTimeout:
+    res = CONF_TIMEOUT
+  resultfile.write(""""INITIAL" %s\n""" % res)
   
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
@@ -109,6 +113,8 @@ def main():
       compiler.compileLearningHeuristics(src, binary)
       print "Compiling and testing the test program"
       res=testLearning(pbc, testProgram, testBinary, options.n)
+    except TimingRunTimeout:
+      res = CONF_TIMEOUT
     except Exception as e:
       sys.stderr.write("Irrecoverable error while learning:\n")
       einfo = sys.exc_info()
