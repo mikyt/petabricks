@@ -93,7 +93,7 @@ def main():
   print "Compiling and testing the initial version of the test program"
   try:
     res = testLearning(pbc, testProgram, testBinary, options.n)
-  except TimingRunTimeout:
+  except pbutil.TimingRunTimeout:
     res = CONF_TIMEOUT
   resultfile.write(""""INITIAL" %s\n""" % res)
   
@@ -113,7 +113,7 @@ def main():
       compiler.compileLearningHeuristics(src, binary)
       print "Compiling and testing the test program"
       res=testLearning(pbc, testProgram, testBinary, options.n)
-    except TimingRunTimeout:
+    except pbutil.TimingRunTimeout:
       res = CONF_TIMEOUT
     except Exception as e:
       sys.stderr.write("Irrecoverable error while learning:\n")
