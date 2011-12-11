@@ -4,6 +4,7 @@ import xml.dom.minidom
 import maximaparser
 import heuristicdb
 import os
+import copy
 from xml.sax.saxutils import escape
 
 
@@ -91,21 +92,31 @@ heuristics in the database  """
       
     #Complete the set
     for heuristic in missingHeuristics:
+      print "----------------------"
+      print "Heuristic %s is missing" % heuristic
       bestN = db.getBestNHeuristics(heuristic, N)
       if len(bestN) == 0:
         #No such heuristic in the DB. Do not complete the set
         #This is not a problem. It's probably a new heuristic:
         #just ignore it and it will fall back on the default implemented 
         #into the compiler
+        print "Not in the DB. Fall back on default"
+        print "----------------------"
         continue
       formula = random.choice(bestN)
       
       if random.random() < CONF_EXPLORATION_PROBABILITY:
-        #Generete a new formula by modifying the existing one
+        #Generate a new formula by modifying the existing one
         formulaObj = maximaparser.parse(formula)
         formulaObj.evolve()
-        formula = str(formulaObj)
         
+        print "EVOLUTION!"
+        print "From: " + formula
+        print "To: " + str(formulaObj)
+        formula = str(formulaObj)
+      else:
+	print "No mutation for "+formula
+      print "----------------------"
       self[heuristic] = formula
   
   
@@ -126,13 +137,35 @@ class HeuristicManager:
 """
   def __init__(self, heuristicSetFileName = None):
     self._heuristicSets = []
-    if heuristicSetFileName is not None:
-      self._xml = xml.dom.minidom.parse(heuristicSetFileName)
-      
-      # Extract information
-      for hSet in self._xml.getElementsByTagName("set"):
-        self._heuristicSets.append(self._parseHeuristicSet(hSet))
+    self._loadHeuristicsFromFile(heuristicSetFileName)
+    self.resetToDefaultFromFile()
     
+      
+  def _loadHeuristicsFromFile(self, heuristicSetFileName):
+    """Load the heuristics from the specified file
+If the name is None, nothing is loaded"""
+    self._heuristicSetsInFile = []
+    
+    if heuristicSetFileName is None:
+      return
+      
+    self._xml = xml.dom.minidom.parse(heuristicSetFileName)
+    
+    # Extract information
+    for hSet in self._xml.getElementsByTagName("set"):
+      self._heuristicSetsInFile.append(self._parseHeuristicSet(hSet))
+      
+    print "Original heuristic set from file: %s" % self._heuristicSetsInFile
+    
+    
+  def resetToDefaultFromFile(self):
+    """Reset the set of heuristics to the one contained in the file
+specified at the construction of the HeuristicManager.
+Removes every other heuristic"""
+    print "Resetting the heuristic sets"
+    print "They were: %s" % self._heuristicSets
+    self._heuristicSets = copy.deepcopy(self._heuristicSetsInFile)
+    print "Now they are: %s" % self._heuristicSets
     
   def _parseHeuristicSet(self, hSetXML):
     """Parses a xml heuristic set returning it as a list of pairs name-formula"""
@@ -147,7 +180,8 @@ class HeuristicManager:
   def allHeuristicSets(self):
     return self._heuristicSets
     
-
+  def reset(self):
+    """Restore the heuristic sets to those contained in the input file"""
 
 
 
@@ -214,6 +248,8 @@ with the originalIndex field added"""
     
     
   def learnHeuristics(self, benchmark):
+    print "Learning: %s" % benchmark
+    
     #Init variables
     candidates = CandidateList(self._candidateSortingKey)
     additionalParameters={}
@@ -225,15 +261,20 @@ with the originalIndex field added"""
       if result != 0:
         return result
       
-    #Get heuristic sets
+    #Get the initial heuristic sets
+    self._heuristicManager.resetToDefaultFromFile()
     allHSets = self._heuristicManager.allHeuristicSets()
+    
     while len(allHSets) < (self._minTrialNumber): #Not enough hSets!
       allHSets.append(HeuristicSet())
     
     #Complete heuristic sets
     neededHeuristics = self._getNeededHeuristcs(benchmark)
     
+    print "Needed heuristics: %s" % neededHeuristics
+    
     for hSet in allHSets:
+      print "Completing %s" % hSet
       hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
     
     count = 0
