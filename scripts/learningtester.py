@@ -93,7 +93,7 @@ def main():
   print "Compiling and testing the initial version of the test program"
   try:
     res = testLearning(pbc, testProgram, testBinary, options.n)
-  except pbutil.TimingRunTimeout:
+  except:
     res = CONF_TIMEOUT
   resultfile.write(""""INITIAL" %s\n""" % res)
   
@@ -115,7 +115,7 @@ def main():
       res=testLearning(pbc, testProgram, testBinary, options.n)
     except pbutil.TimingRunTimeout:
       res = CONF_TIMEOUT
-    except Exception as e:
+    except Exception:
       sys.stderr.write("Irrecoverable error while learning:\n")
       einfo = sys.exc_info()
       print einfo[0]
