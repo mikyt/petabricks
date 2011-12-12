@@ -14,21 +14,22 @@ class HeuristicDB:
           "Heuristic.score/Heuristic.useCount as finalScore "
           "FROM Heuristic "
           "ORDER BY Heuristic.score/Heuristic.useCount")
-    self.__bestNCache= dict()
     
   def __createTable(self, name, params):
     cur = self.__db.cursor()
     query = "CREATE TABLE IF NOT EXISTS '"+name+"' "+params
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
+
     
   def __createView(self, name, params):
     cur = self.__db.cursor()
     query = "CREATE VIEW IF NOT EXISTS '"+name+"' AS "+params
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
+
     
   def __createTables(self):
     self.__createTable("HeuristicKind", "('ID' INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -57,8 +58,8 @@ class HeuristicDB:
     cur = self.__db.cursor()
     query = "INSERT OR IGNORE INTO HeuristicKind ('name') VALUES ('"+kindName+"')"
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
     return self.getHeuristicKindID(kindName)
     
   def increaseHeuristicScore(self, name, formula, score):
@@ -70,8 +71,8 @@ class HeuristicDB:
       #There was no such heuristic in the DB: probably it was taken from the defaults
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, ?)"
       cur.execute(query, (kindID, formula, score))
-    cur.close()
     self.__db.commit()
+    cur.close()
   
   def increaseHeuristicUseCount(self, name, formula):
     kindID=self.storeHeuristicKind(name) 
@@ -82,8 +83,9 @@ class HeuristicDB:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, 0)"
       cur.execute(query, (kindID, formula))
-    cur.close()
     self.__db.commit()
+    cur.close()
+    
   
   def increaseScore(self, hSet, score):
     """Increase the score of a set of heuristics by the given amount"""
@@ -98,17 +100,9 @@ class HeuristicDB:
       self.increaseHeuristicUseCount(name, formula)
 
   def getBestNHeuristics(self, name, N):
-    try:
-      cached = self.__bestNCache[name]
-      return cached
-    except:
-      #Not in the cache
-      #Fall back to accessing the db
-      pass
     cur = self.__db.cursor()
     query = "SELECT formula FROM Heuristic JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID WHERE HeuristicKind.name=? ORDER BY Heuristic.score/Heuristic.useCount DESC LIMIT ?"
     cur.execute(query, (name, N))
     result = [row[0] for row in cur.fetchall()]
     cur.close()
-    self.__bestNCache[name]=result
     return result
