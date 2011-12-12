@@ -5,6 +5,7 @@ import maximaparser
 import heuristicdb
 import os
 import copy
+import pprint
 from xml.sax.saxutils import escape
 
 
@@ -13,6 +14,9 @@ CONF_MIN_TRIAL_NUMBER = 6
 CONF_EXPLORATION_PROBABILITY = 0.7
 CONF_PICK_BEST_N = 3
 #------------------------------------------
+
+class AllCandidatesCrashError(Exception):
+  pass
 
 class Candidate:
   """Represents a learning candidate. Objects can be considered candidate 
@@ -102,6 +106,7 @@ heuristics in the database  """
         #into the compiler
         print "Not in the DB. Fall back on default"
         print "----------------------"
+        #raw_input()
         continue
       formula = random.choice(bestN)
       
@@ -118,7 +123,7 @@ heuristics in the database  """
 	print "No mutation for "+formula
       print "----------------------"
       self[heuristic] = formula
-  
+      #raw_input()
   
   
     
@@ -223,9 +228,9 @@ class Learner:
     
     if getNeededHeuristics is None:
       #Return an empty list
-      self._getNeededHeuristcs = lambda : []
+      self._getNeededHeuristics = lambda : []
     else:
-      self._getNeededHeuristcs = getNeededHeuristics
+      self._getNeededHeuristics = getNeededHeuristics
       
     random.seed()
     
@@ -237,6 +242,10 @@ with the originalIndex field added"""
     numCandidates = len(candidates)
     count = 0
     for candidate in candidates:
+      print "Storing this heuristic set:"
+      pp=pprint.PrettyPrinter()
+      pp.pprint(candidate.heuristicSet)
+      #raw_input()
       score = (numCandidates - count) / float(numCandidates)
       self._db.markAsUsed(candidate.heuristicSet)
       
@@ -245,6 +254,32 @@ with the originalIndex field added"""
         
       count = count +1
       
+    
+  def _generateAndTestHSets(self, benchmark, additionalParameters):
+    candidates = additionalParameters["candidates"]
+    neededHeuristics = additionalParameters["neededHeuristics"]
+    
+    #Get the initial heuristic sets
+    self._heuristicManager.resetToDefaultFromFile()
+    allHSets = self._heuristicManager.allHeuristicSets()
+    
+    while len(allHSets) < (self._minTrialNumber): #Not enough hSets!
+      allHSets.append(HeuristicSet())
+    
+    #Complete heuristic sets
+    for hSet in allHSets:
+      print "Completing %s" % hSet
+      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
+    
+    count = 0
+    for hSet in allHSets:
+      count = count + 1
+      currentCandidate = self._testHSet(benchmark, count, hSet, additionalParameters) 
+      candidates.append(currentCandidate)
+    
+    if candidates[0].failed:
+      raise AllCandidatesCrashError
+    
     
     
   def learnHeuristics(self, benchmark):
@@ -260,37 +295,21 @@ with the originalIndex field added"""
       result = self._setup(benchmark, additionalParameters) 
       if result != 0:
         return result
-      
-    #Get the initial heuristic sets
-    self._heuristicManager.resetToDefaultFromFile()
-    allHSets = self._heuristicManager.allHeuristicSets()
     
-    while len(allHSets) < (self._minTrialNumber): #Not enough hSets!
-      allHSets.append(HeuristicSet())
-    
-    #Complete heuristic sets
-    neededHeuristics = self._getNeededHeuristcs(benchmark)
-    
+    neededHeuristics = self._getNeededHeuristics(benchmark)
+    additionalParameters["neededHeuristics"] = neededHeuristics
     print "Needed heuristics: %s" % neededHeuristics
     
-    for hSet in allHSets:
-      print "Completing %s" % hSet
-      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
-    
-    count = 0
-    for hSet in allHSets:
-      count = count + 1
-      currentCandidate = self._testHSet(benchmark, count, hSet, additionalParameters) 
-      candidates.append(currentCandidate)
+    canLearn = (len(neededHeuristics) > 0)
+    if canLearn:
+      self._generateAndTestHSets(benchmark, additionalParameters)
       
     candidates.addOriginalIndex()
     candidates.sort()
     
-    if candidates[0].failed:
-      print "ALL candidates crash!"
-      return -1
+    if canLearn:
+      self.storeCandidatesDataInDB(candidates)
     
-    self.storeCandidatesDataInDB(candidates)
     
     if self._tearDown is not None:
       self._tearDown(benchmark, additionalParameters)
