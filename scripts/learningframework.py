@@ -6,13 +6,14 @@ import heuristicdb
 import os
 import copy
 import pprint
+import random
 from xml.sax.saxutils import escape
 
 
 #---------------- Config ------------------
 CONF_MIN_TRIAL_NUMBER = 6
 CONF_EXPLORATION_PROBABILITY = 0.7
-CONF_PICK_BEST_N = 3
+CONF_PICK_BEST_N = 5
 #------------------------------------------
 
 class AllCandidatesCrashError(Exception):
@@ -51,6 +52,8 @@ class SuccessfulCandidate(Candidate):
 
   
 class HeuristicSet(dict):
+  """Represents a set of heuristics"""
+  
   def toXmlStrings(self):
     return ["<heuristic name=\""+name+"\" formula=\""+escape(self[name])+"\" />" for name in self]
   
@@ -124,8 +127,15 @@ heuristics in the database  """
       print "----------------------"
       self[heuristic] = formula
       #raw_input()
-  
-  
+
+    return False
+    
+  def forceEvolution():
+    (name, formula) = random.choice(self.items())
+    formulaObj = maximaparser.parse(formula)
+    formulaObj.evolve()
+    self[name]=str(formulaObj)
+    
     
 class HeuristicManager:
   """Manages sets of heuristics stored in a file with the following format:
@@ -267,9 +277,27 @@ with the originalIndex field added"""
       allHSets.append(HeuristicSet())
     
     #Complete heuristic sets
+    count = 0
     for hSet in allHSets:
       print "Completing %s" % hSet
       hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
+      
+      while hSet in allHSets[:count]:
+	#Prevent having two identical sets of heuristics
+	print "hSet %d is equal to the current one is already present in the list" % count
+	print "HSet:"
+	pp=pprint.PrettyPrinter()
+	pp.pprint(hSet)
+	print "List:"
+	pp.pprint(allHSets[:count])
+	
+	hSet.forceEvolution()
+	
+	print "hSet %d has been evolved to: " % count
+	pp.pprint(hSet)
+	#raw_input()
+	
+      count = count + 1
     
     count = 0
     for hSet in allHSets:
