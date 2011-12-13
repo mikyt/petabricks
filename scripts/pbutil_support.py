@@ -2,7 +2,7 @@ import os
 import subprocess
 import threading
 import time
-
+import signal
 
 def killSubprocess(p):
   if p.poll() is None:
@@ -57,6 +57,8 @@ def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=Non
       
     #Execute the compiler
     NULL=open("/dev/null", "w")
+    
+    print "Executing: %s" % cmd
     p = subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
     
     if timeout is not None:
