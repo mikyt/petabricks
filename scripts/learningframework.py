@@ -130,7 +130,7 @@ heuristics in the database  """
 
     return False
     
-  def forceEvolution():
+  def forceEvolution(self):
     (name, formula) = random.choice(self.items())
     formulaObj = maximaparser.parse(formula)
     formulaObj.evolve()
