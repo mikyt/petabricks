@@ -143,6 +143,12 @@ the given collection.
 
 If an identical heuristic set is found in the collection, the current one 
 is evolved until it becomes different and unique"""
+    if len(self) == 0:
+      #Empty heuristic set: always consider it as unique
+      #TODO: remove this when it will be possible to generate euristics 
+      #from scratch
+      return
+    
     while self in hSetCollection:
 	#Prevent having two identical sets of heuristics
 	print "hSet is equal to one already present in the collection"
