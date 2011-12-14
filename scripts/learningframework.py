@@ -137,6 +137,29 @@ heuristics in the database  """
     self[name]=str(formulaObj)
     
     
+  def ensureUnique(self, hSetCollection):
+    """Ensure that the current heuristic set is unique with respect to those in
+the given collection.
+
+If an identical heuristic set is found in the collection, the current one 
+is evolved until it becomes different and unique"""
+    while self in hSetCollection:
+	#Prevent having two identical sets of heuristics
+	print "hSet is equal to one already present in the collection"
+	print "HSet:"
+	pp=pprint.PrettyPrinter()
+	pp.pprint(self)
+	print "Collection:"
+	pp.pprint(hSetCollection)
+	
+	self.forceEvolution()
+	
+	print "hSet has been evolved to: "
+	pp.pprint(self)
+	#raw_input()
+    
+    
+    
 class HeuristicManager:
   """Manages sets of heuristics stored in a file with the following format:
 <heuristics>
@@ -194,11 +217,6 @@ Removes every other heuristic"""
   
   def allHeuristicSets(self):
     return self._heuristicSets
-    
-  def reset(self):
-    """Restore the heuristic sets to those contained in the input file"""
-
-
 
 
 class CandidateList(list):  
@@ -236,6 +254,9 @@ class Learner:
     self._candidateSortingKey = candidateSortingKey
     self._tearDown = tearDown
     
+    hSetsFromFile = self._heuristicManager.allHeuristicSets()
+    self._db.addAsFavoriteCandidates(hSetsFromFile)
+    
     if getNeededHeuristics is None:
       #Return an empty list
       self._getNeededHeuristics = lambda : []
@@ -269,35 +290,22 @@ with the originalIndex field added"""
     candidates = additionalParameters["candidates"]
     neededHeuristics = additionalParameters["neededHeuristics"]
     
-    #Get the initial heuristic sets
-    self._heuristicManager.resetToDefaultFromFile()
-    allHSets = self._heuristicManager.allHeuristicSets()
-    
-    while len(allHSets) < (self._minTrialNumber): #Not enough hSets!
+    #Generate the needed (empty) heuristicSets
+    allHSets = []
+    for i in range(self._minTrialNumber):
       allHSets.append(HeuristicSet())
     
     #Complete heuristic sets
-    count = 0
+    count=0
     for hSet in allHSets:
       print "Completing %s" % hSet
       hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
       
-      while hSet in allHSets[:count]:
-	#Prevent having two identical sets of heuristics
-	print "hSet %d is equal to the current one is already present in the list" % count
-	print "HSet:"
-	pp=pprint.PrettyPrinter()
-	pp.pprint(hSet)
-	print "List:"
-	pp.pprint(allHSets[:count])
-	
-	hSet.forceEvolution()
-	
-	print "hSet %d has been evolved to: " % count
-	pp.pprint(hSet)
-	#raw_input()
-	
+      previousHSets = allHSets[:count]
+      hSet.ensureUnique(previousHSets)
+      
       count = count + 1
+    
     
     count = 0
     for hSet in allHSets:

@@ -106,3 +106,11 @@ class HeuristicDB:
     result = [row[0] for row in cur.fetchall()]
     cur.close()
     return result
+
+    
+  def addAsFavoriteCandidates(self, heuristicSets, maximumScore=1):
+    """Adds all the heuristics sets contained in "heuristicSets" to the 
+database, with maximum score, so that they will be selected with maximum likelihood"""
+    for hSet in heuristicSets:
+      self.markAsUsed(hSet)
+      self.increaseScore(hSet, maximumScore)
