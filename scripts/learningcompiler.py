@@ -14,9 +14,9 @@ import sgatuner
 from candidatetester import Candidate
 
 #------------------ Config --------------------
-CONF_MAX_TIME = 10 #Seconds
+CONF_MAX_TIME = 60 #Seconds
 CONF_DELETE_TEMP_DIR = True
-CONF_TIMEOUT = 5*60
+CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #----------------------------------------------
 
@@ -33,7 +33,7 @@ then by average execution time of the biggest dimension (the lower the better)""
   
 
 class LearningCompiler:
-  def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None):
+  def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, maxTuningTime=CONF_MAX_TIME):
     self._learner = learningframework.Learner(self.testHSet,
                                               candidateKey,
                                               heuristicSetFileName,
@@ -42,6 +42,8 @@ class LearningCompiler:
                                               self.getNeededHeuristics)
     self._pbcExe = pbcExe    
     self._jobs = jobs
+    self._n = n
+    self._maxTuningTime = maxTuningTime
     
     
   def compileLearningHeuristics(self, benchmark, finalBinary = None):
@@ -97,7 +99,7 @@ following attributes:
         
     #Autotune
     try:
-      sgatuner.autotune_withparams(binary, candidates, max_time=CONF_MAX_TIME)
+      sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
       
       #Candidate has not failed: mark as such
       candidate = candidates[-1]
@@ -150,7 +152,7 @@ following attributes:
       return status
       
     try:
-      sgatuner.autotune_withparams(binary, candidates, max_time=CONF_MAX_TIME)
+      sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
       
       #Candidate has not failed: mark as such
       currentCandidate = candidates[-1]

@@ -33,6 +33,14 @@ def parseCmdline(petabricks_path):
 		    type="string",
 		    help="file containing the results in gnuplot-compatible format",
 		    default="training-results.dat")
+  parser.add_option("--maxtuningsize",
+		    type="int",
+		    help="maximum size of the input to be used tuning a candidate",
+		    default=None)
+  parser.add_option("--maxtuningtime",
+		    type="int",
+		    help="maximum time (in seconds) to be spent tuning a candidate",
+		    default=None)
 		    
   return parser.parse_args()
 
@@ -83,7 +91,7 @@ def main():
   testBinary = os.path.splitext(testProgram)[0]
   
   compiler = learningcompiler.LearningCompiler(pbc, 
-                                      heuristicSetFileName = options.heuristics)
+                                      heuristicSetFileName = options.heuristics, n=options.n, maxTuningTime=options.maxtuningtime)
   
   examples_path= os.path.join(petabricks_path, "examples")
   
