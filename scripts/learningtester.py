@@ -25,34 +25,38 @@ def parseCmdline(petabricks_path):
           type="string", 
           help="name of the file containing the list of programs to learn from", 
           default=os.path.join(petabricks_path, "scripts/trainingset.txt"))
-  parser.add_option("-n",
+  parser.add_option("--maxtestsize",
                     type="int",
                     help="size of the input to generate for testing",
                     default=256)
+  parser.add_option("--maxtesttime",
+	    type="int",
+	    help="maximum time (in seconds) to be spent tuning the test program",
+	    default=CONF_TIMEOUT)
   parser.add_option("--resultfile",
-		    type="string",
-		    help="file containing the results in gnuplot-compatible format",
-		    default="training-results.dat")
+		type="string",
+		help="file containing the results in gnuplot-compatible format",
+		default="training-results.dat")
   parser.add_option("--maxtuningsize",
-		    type="int",
-		    help="maximum size of the input to be used tuning a candidate",
-		    default=None)
+		type="int",
+		help="maximum size of the input to be used tuning a candidate",
+		default=None)
   parser.add_option("--maxtuningtime",
-		    type="int",
-		    help="maximum time (in seconds) to be spent tuning a candidate",
-		    default=None)
+		type="int",
+		help="maximum time (in seconds) to be spent tuning a candidate",
+		default=None)
 		    
   return parser.parse_args()
 
 
 
-def testLearning(pbc, testProgram, testBinary, n):
+def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT):
   """Tests the effects of learning, by compiling the benchmark with the current
 best heuristics, then executing it and fetching the average timing result"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
   
   candidates=[]
-  sgatuner.autotune_withparams(testBinary, candidates, n, CONF_TIMEOUT)
+  sgatuner.autotune_withparams(testBinary, candidates, n, maxtime)
   
   candidate = candidates[0]
   numDimensions = len(candidate.metrics[0])
@@ -91,7 +95,9 @@ def main():
   testBinary = os.path.splitext(testProgram)[0]
   
   compiler = learningcompiler.LearningCompiler(pbc, 
-                                      heuristicSetFileName = options.heuristics, n=options.n, maxTuningTime=options.maxtuningtime)
+                                      heuristicSetFileName = options.heuristics,
+                                      n=options.maxtuningsize, 
+                                      maxTuningTime=options.maxtuningtime)
   
   examples_path= os.path.join(petabricks_path, "examples")
   
@@ -100,7 +106,11 @@ def main():
   
   print "Compiling and testing the initial version of the test program"
   try:
-    res = testLearning(pbc, testProgram, testBinary, options.n)
+    res = testLearning(pbc, 
+		       testProgram, 
+		       testBinary, 
+		       options.maxtestsize, 
+		       options.maxtesttime)
   except:
     res = CONF_TIMEOUT
   resultfile.write(""""INITIAL" %s\n""" % res)
@@ -120,7 +130,11 @@ def main():
     try:
       compiler.compileLearningHeuristics(src, binary)
       print "Compiling and testing the test program"
-      res=testLearning(pbc, testProgram, testBinary, options.n)
+      res=testLearning(pbc, 
+		       testProgram, 
+		       testBinary, 
+		       options.maxtestsize, 
+		       options.maxtesttime)
     except pbutil.TimingRunTimeout:
       res = CONF_TIMEOUT
     except Exception:
