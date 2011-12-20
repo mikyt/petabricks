@@ -476,7 +476,7 @@ def executeTimingRun(prog, n=None, args=[], limit=None, returnTags='timing', tri
     """Exactly one of n and iogen_run should have value"""
     raise ValueError
       
-  cmd = [ prog, "--time", "--trials=%d"%trials]
+  cmd = [ prog, "--time"]
   
   if n is not None:
     cmd.append("--n=%d" % n)
@@ -485,6 +485,9 @@ def executeTimingRun(prog, n=None, args=[], limit=None, returnTags='timing', tri
   cmd.extend(args);
   if limit:
     cmd.append("--max-sec=%f" % float(limit))
+  if trials:
+    cmd.append("--trials=%d"%trials)
+    
   return executeRun(cmd, returnTags)
 
 def collectTimingSamples(prog, n=100, step=100, maxTime=10.0, x=[], y=[], args=[], scaler=lambda x: x):
