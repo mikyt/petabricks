@@ -198,18 +198,13 @@ If the name is None, nothing is loaded"""
     # Extract information
     for hSet in self._xml.getElementsByTagName("set"):
       self._heuristicSetsInFile.append(self._parseHeuristicSet(hSet))
-      
-    print "Original heuristic set from file: %s" % self._heuristicSetsInFile
     
     
   def resetToDefaultFromFile(self):
     """Reset the set of heuristics to the one contained in the file
 specified at the construction of the HeuristicManager.
 Removes every other heuristic"""
-    print "Resetting the heuristic sets"
-    print "They were: %s" % self._heuristicSets
     self._heuristicSets = copy.deepcopy(self._heuristicSetsInFile)
-    print "Now they are: %s" % self._heuristicSets
     
   def _parseHeuristicSet(self, hSetXML):
     """Parses a xml heuristic set returning it as a list of pairs name-formula"""
