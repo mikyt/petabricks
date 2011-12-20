@@ -470,8 +470,18 @@ def executeRaceRun(_cmd, configa, configb, retries=3):
   return aresult, bresult
 
 #parse timing results with a given time limit
-def executeTimingRun(prog, n, args=[], limit=None, returnTags='timing', trials=1):
-  cmd = [ prog, "--n=%d"%n, "--time", "--trials=%d"%trials ]
+def executeTimingRun(prog, n=None, args=[], limit=None, returnTags='timing', trials=1, iogen_run=None):
+  if ((n is not None) and (iogen_run is not None)) or \
+    ((n is None) and (iogen_run is None)):
+    """Exactly one of n and iogen_run should have value"""
+    raise ValueError
+      
+  cmd = [ prog, "--time", "--trials=%d"%trials]
+  
+  if n is not None:
+    cmd.append("--n=%d" % n)
+  if iogen_run is not None:
+    cmd.append("--iogen-run=%s"%iogen_run)
   cmd.extend(args);
   if limit:
     cmd.append("--max-sec=%f" % float(limit))

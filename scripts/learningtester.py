@@ -10,10 +10,12 @@ import sys
 import pbutil
 import sgatuner
 import traceback
+import subprocess
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
 CONF_TIMEOUT=5*60
+STATIC_INPUT_PREFIX="test"
 
 def parseCmdline(petabricks_path):
   parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
@@ -50,27 +52,31 @@ def parseCmdline(petabricks_path):
 
 
 
-def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT):
+def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT, staticInputName=None, generateStaticInput=False):
   """Tests the effects of learning, by compiling the benchmark with the current
-best heuristics, then executing it and fetching the average timing result"""
+best heuristics, then executing it and fetching the average timing result
+
+If staticInputName is specified, such input is used. If generateStaticInput is True, than it is also generated"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
   
   candidates=[]
   sgatuner.autotune_withparams(testBinary, candidates, n, maxtime)
   
-  candidate = candidates[0]
-  numDimensions = len(candidate.metrics[0])
-  maxDimension = 2**(numDimensions-1)
-  
-  if maxDimension == n:
-    #The tuning process already computed the average time of execution
-    #for the desired input size: use it!
-    avgExecutionTime = candidate.metrics[0][maxDimension].mean()
+  if generateStaticInput:
+    if not staticInputName:
+      raise IOError
+    cmd=[testBinary, "--n=%s"%n, "--iogen-create=%s"%staticInputName]
+    subprocess.Popen(cmd)
+
+  if staticInputName:
+    iogen_run=staticInputName
+    size=None
   else:
-    #The tuning was interrupted by the timeout
-    #Explicitly compute the timing for the size we want
-    res=pbutil.executeTimingRun(testBinary, n, args=[], limit=CONF_TIMEOUT, trials=3)
-    avgExecutionTime=res["average"]
+    iogen_run=None
+    size=n
+    
+  res=pbutil.executeTimingRun(testBinary, n=size, limit=CONF_TIMEOUT, iogen_run=iogen_run)
+  avgExecutionTime=res["average"]
   
   return avgExecutionTime
   
@@ -110,9 +116,18 @@ def main():
 		       testProgram, 
 		       testBinary, 
 		       options.maxtestsize, 
-		       options.maxtesttime)
+		       options.maxtesttime,
+		       STATIC_INPUT_PREFIX,
+		       generateStaticInput=True)
   except:
+    sys.stderr.write("ERROR compiling and testing the test program:\n")
+    einfo = sys.exc_info()
+    print einfo[0]
+    print einfo[1]
+    traceback.print_tb(einfo[2])
     res = CONF_TIMEOUT
+    sys.exit(-1)
+  
   resultfile.write(""""INITIAL" %s\n""" % res)
   
   for line in trainingset:
@@ -134,10 +149,11 @@ def main():
 		       testProgram, 
 		       testBinary, 
 		       options.maxtestsize, 
-		       options.maxtesttime)
+		       options.maxtesttime,
+		       STATIC_INPUT_PREFIX)
     except pbutil.TimingRunTimeout:
       res = CONF_TIMEOUT
-    except Exception:
+    except:
       sys.stderr.write("Irrecoverable error while learning:\n")
       einfo = sys.exc_info()
       print einfo[0]
