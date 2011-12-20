@@ -66,7 +66,12 @@ If staticInputName is specified, such input is used. If generateStaticInput is T
     if not staticInputName:
       raise IOError
     cmd=[testBinary, "--n=%s"%n, "--iogen-create=%s"%staticInputName]
-    subprocess.Popen(cmd)
+    
+    print "Generating input files for the test program"
+    NULL=open("/dev/null","w")
+    p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
+    p.wait()
+    NULL.close()
 
   if staticInputName:
     iogen_run=staticInputName
@@ -75,7 +80,7 @@ If staticInputName is specified, such input is used. If generateStaticInput is T
     iogen_run=None
     size=n
     
-  res=pbutil.executeTimingRun(testBinary, n=size, limit=CONF_TIMEOUT, iogen_run=iogen_run)
+  res=pbutil.executeTimingRun(testBinary, n=size, trials=None, iogen_run=iogen_run)
   avgExecutionTime=res["average"]
   
   return avgExecutionTime
