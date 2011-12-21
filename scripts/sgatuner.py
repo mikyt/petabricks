@@ -15,7 +15,7 @@ from configtool import defaultConfigFile
 from candidatetester import Candidate, CandidateTester
 from mutators import MutateFailed
 from traininginfo import TrainingInfo
-from tunerconfig import config, option_callback
+from tunerconfig import config, config_defaults, option_callback
 from tunerwarnings import InitialProgramCrash,ExistingProgramCrash,NewProgramCrash,TargetNotMet
 from storagedirs import timers
 import tunerwarnings
@@ -563,6 +563,35 @@ def autotune(benchmark, returnBest=None):
   return storagedirs.callWithLogDir(lambda: autotuneInner(benchmark, returnBest),
                                     config.output_dir,
                                     config.delete_output_dir)
+
+def autotune_withparams(benchmark, returnBest=None, n=None, max_time=None):
+  """Executes the autotuning of the benchmark program setting the configuration
+of the autotuner with ONLY the parameters given at the function call.
+
+The current global configuration of the autotuner is saved and is restored
+at the exit form this function"""
+
+  #Store current config parameters                                 
+  old_config_dict = config.__dict__.copy()                      
+                                                                
+  #Reset the config to the default values                             
+  config.__dict__ = config_defaults.__dict__.copy()                
+                                                                   
+  #Change the config as specified by the parameters
+  if n:
+    tunerconfig.applypatch(tunerconfig.patch_n(n))
+    
+  if max_time:
+    config.max_time=max_time
+                                                                   
+  #Autotune                               
+  res = autotune(benchmark, returnBest)                                  
+                                                                   
+  #Restore previous config parameters                              
+  config.__dict__ = old_config_dict.copy()
+  
+  return res
+  
 
 def regression_check(benchmark):
   tunerconfig.applypatch(tunerconfig.patch_regression)

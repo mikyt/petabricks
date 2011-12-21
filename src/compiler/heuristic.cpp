@@ -26,14 +26,18 @@
  *****************************************************************************/
 #include "heuristic.h"
 
-double petabricks::Heuristic::eval (const ValueMap featureValues) const {
+double petabricks::Heuristic::eval (const ValueMap featureValues) {
   double value = evalWithoutLimits(featureValues);
+  
+  _uses++;
   
   //Keep the value within the limits
   if (value < _min) {
+    _tooLow++;
     return _min;
   }
   else if (value > _max) {
+    _tooHigh++;
     return _max;
   }
   else {

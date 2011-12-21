@@ -131,11 +131,19 @@ class FormulaBinop:
     else:
       #Constant folding
       #Handle special cases where sintax is different
-      if self.op == "=":
-	op = "=="
-	reprStr = "("+ str(self.left) +" "+ str(op) + " " + str(self.right)+")"
+      op = self._pythonOperator()
+      reprStr = "("+ str(self.left) +" "+ str(op) + " " + str(self.right)+")"
       
       return str(eval(reprStr))
+  
+  def _pythonOperator(self):
+    """Return the python representation of the operator"""
+    if self.op == "=":
+      return "=="
+    elif self.op == "#":
+      return "!="
+    else:
+      return self.op
     
   def evolveValue(self):
     """Randomly mutates one of the values (int, float, bool) that are in the 
@@ -159,7 +167,7 @@ Returns true if the formula was actually mutated, false otherwise"""
   
   
   def evolveOperator(self):
-    comparison_operators=["=", "!=", "<", ">", ">=", "<="]
+    comparison_operators=["=", "#", "<", ">", ">=", "<="]
     binary_logic_operators=["and", "or"]
     arithmetic_operators=["+", "-", "*", "/"]
     

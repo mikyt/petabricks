@@ -25,7 +25,7 @@ reserved = {"true" : "BOOL_T",
             
 #Tokens and literals lists, as required by ply.lex
 tokens = ["INTEGER", "FLOAT", "IDENT", "LE", "GE", ] + list(reserved.values())
-literals = ["=", "<", ">", ",", "*", "/", "(", ")", "[", "]", "\n", "^", "+", "-"] 
+literals = ["=", "#", "<", ">", ",", "*", "/", "(", ")", "[", "]", "\n", "^", "+", "-"] 
   
 @TOKEN(WS)
 def t_WS(t):
@@ -50,7 +50,7 @@ t_GE = r'>='
 # -------------------------- PARSER ----------------------------
 precedence = (
   ('left', 'AND', 'OR'),
-  ('nonassoc', '=', '<', '>', 'LE', 'GE'),
+  ('nonassoc', '=', '#', '<', '>', 'LE', 'GE'),
   ('right', 'IF', 'THEN', 'ELSE'),
   ('left', '-', '+'),
   ('left', '*', '/'),
@@ -112,6 +112,10 @@ def p_binop_div(p):
 def p_binop_eq(p):
   r"FormulaBinop : Formula '=' Formula"
   p[0]=FormulaBinop("=",p[1],p[3])
+  
+def p_binop_neq(p):
+  r"FormulaBinop : Formula '#' Formula"
+  p[0]=FormulaBinop("#",p[1],p[3])
 
 def p_binop_lt(p):
   r"FormulaBinop : Formula '<' Formula"

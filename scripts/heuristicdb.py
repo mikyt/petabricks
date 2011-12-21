@@ -14,21 +14,22 @@ class HeuristicDB:
           "Heuristic.score/Heuristic.useCount as finalScore "
           "FROM Heuristic "
           "ORDER BY Heuristic.score/Heuristic.useCount")
-    self.__bestNCache= dict()
     
   def __createTable(self, name, params):
     cur = self.__db.cursor()
     query = "CREATE TABLE IF NOT EXISTS '"+name+"' "+params
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
+
     
   def __createView(self, name, params):
     cur = self.__db.cursor()
     query = "CREATE VIEW IF NOT EXISTS '"+name+"' AS "+params
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
+
     
   def __createTables(self):
     self.__createTable("HeuristicKind", "('ID' INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -52,15 +53,17 @@ class HeuristicDB:
     kindID = cur.fetchone()[0]
     cur.close()
     return kindID
-    
+  
+  
   def storeHeuristicKind(self, kindName):
     cur = self.__db.cursor()
     query = "INSERT OR IGNORE INTO HeuristicKind ('name') VALUES ('"+kindName+"')"
     cur.execute(query)
-    cur.close()
     self.__db.commit()
+    cur.close()
     return self.getHeuristicKindID(kindName)
-    
+  
+  
   def increaseHeuristicScore(self, name, formula, score):
     kindID=self.storeHeuristicKind(name) 
     cur = self.__db.cursor()
@@ -70,45 +73,102 @@ class HeuristicDB:
       #There was no such heuristic in the DB: probably it was taken from the defaults
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, ?)"
       cur.execute(query, (kindID, formula, score))
-    cur.close()
     self.__db.commit()
+    cur.close()
   
-  def increaseHeuristicUseCount(self, name, formula):
-    kindID=self.storeHeuristicKind(name) 
+  
+  def increaseHeuristicUseCount(self, heuristic, uses=None):
+    if uses is not None:
+      count = uses
+    else:
+      count = heuristic.uses
+    
+    kindID=self.storeHeuristicKind(heuristic.name) 
     cur = self.__db.cursor()
-    query = "UPDATE Heuristic SET useCount=useCount+1 WHERE kindID=? AND formula=?"
-    cur.execute(query, (kindID, formula))
+    query = "UPDATE Heuristic SET useCount=useCount+? WHERE kindID=? AND formula=?"
+    cur.execute(query, (count, kindID, heuristic.formula))
     if cur.rowcount == 0:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, 0)"
-      cur.execute(query, (kindID, formula))
-    cur.close()
+      cur.execute(query, (kindID, heuristic.formula))
     self.__db.commit()
+    cur.close()
+    
   
-  def increaseScore(self, hSet, score):
+  def _computeScore(self, heuristic, points):
+    uses = heuristic.uses
+    outofbounds = heuristic.tooLow + heuristic.tooHigh
+    return points * (uses - outofbounds)
+    
+  def addToScore(self, hSet, points, weightedScore=True):
     """Increase the score of a set of heuristics by the given amount"""
     #TODO: also store it as a set
-    for name, formula in hSet.iteritems():
-      self.increaseHeuristicScore(name, formula, score)
       
-  def markAsUsed(self, hSet):
+    for name, heuristic in hSet.iteritems():
+      if weightedScore:
+	outofbounds = heuristic.tooHigh + heuristic.tooLow
+	uses = heuristic.uses 
+	score = self._computeScore(heuristic, points)
+      else:
+	score = points
+      
+      self.increaseHeuristicScore(name, heuristic.formula, score)
+      
+      
+  def markAsUsed(self, hSet, uses=None):
     """Mark a set of heuristics as used for generating a candidate executable"""
     #TODO: also store it as a set
-    for name, formula in hSet.iteritems():
-      self.increaseHeuristicUseCount(name, formula)
+    for name, heuristic in hSet.iteritems():
+      self.increaseHeuristicUseCount(heuristic, uses)
 
+  def updateHSetWeightedScore(self, heuristicSet, points):
+    #TODO: also store it as a set
+    for name, heuristic in heuristicSet.iteritems():
+      self.updateHeuristicWeightedScore(heuristic, points)
+    
+  def updateHeuristicWeightedScore(self, heuristic, points):
+    """The new score of the heuristic is given by the average of the current score and the new score,
+    rescaled in such a way to have the use count equal to the sum of the use count of the old and new scores:
+    
+    finalScore = ((oldScore/oldUses) + (newScore/newUses))/2 * (oldUses+newUses)
+    finalUses = oldUses + newUses"""
+    newScore = self._computeScore(heuristic, points)
+    newUses = heuristic.uses
+    
+    print "UPDATING Heuristic"
+    print heuristic
+    print "newScore: %f" % newScore
+    
+    kindID=self.storeHeuristicKind(heuristic.name) 
+    cur = self.__db.cursor()
+    query = "UPDATE Heuristic SET " \
+            "score=((score/useCount)+(?/?))/2 *(useCount+?), " \
+            "useCount=useCount+? " \
+            "WHERE kindID=? AND formula=?"
+    cur.execute(query, (newScore, newUses, newUses, newUses, kindID, heuristic.formula))
+    if cur.rowcount == 0:
+      #There was no such heuristic in the DB: let's add it
+      query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, ?, ?)"
+      print "NEW!!!"
+      cur.execute(query, (kindID, heuristic.formula, heuristic.uses, newScore))
+    self.__db.commit()
+    cur.close()
+    
+    
+    
+    
   def getBestNHeuristics(self, name, N):
-    try:
-      cached = self.__bestNCache[name]
-      return cached
-    except:
-      #Not in the cache
-      #Fall back to accessing the db
-      pass
     cur = self.__db.cursor()
     query = "SELECT formula FROM Heuristic JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID WHERE HeuristicKind.name=? ORDER BY Heuristic.score/Heuristic.useCount DESC LIMIT ?"
     cur.execute(query, (name, N))
     result = [row[0] for row in cur.fetchall()]
     cur.close()
-    self.__bestNCache[name]=result
     return result
+
+    
+  def addAsFavoriteCandidates(self, heuristicSets, maximumScore=1):
+    """Adds all the heuristics sets contained in "heuristicSets" to the 
+database, with maximum score, so that they will be selected with maximum likelihood"""
+    for hSet in heuristicSets:
+      self.markAsUsed(hSet, 1)
+      self.addToScore(hSet, maximumScore, weightedScore=False)

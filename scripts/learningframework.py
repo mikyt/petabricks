@@ -4,14 +4,20 @@ import xml.dom.minidom
 import maximaparser
 import heuristicdb
 import os
+import copy
+import pprint
+import random
 from xml.sax.saxutils import escape
 
 
 #---------------- Config ------------------
 CONF_MIN_TRIAL_NUMBER = 6
 CONF_EXPLORATION_PROBABILITY = 0.7
-CONF_PICK_BEST_N = 3
+CONF_PICK_BEST_N = 5
 #------------------------------------------
+
+class AllCandidatesCrashError(Exception):
+  pass
 
 class Candidate:
   """Represents a learning candidate. Objects can be considered candidate 
@@ -44,10 +50,80 @@ class SuccessfulCandidate(Candidate):
   def __init__(self, heuristicSet):
     Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, originalIndex=None)
 
+
+class Heuristic(object):
+  def __init__(self, name, formula, uses=None, tooLow=None, tooHigh=None):
+    self._name = name
+    self._formula = formula
+    
+    if (uses is None) or uses=="":
+      self._uses=None
+    else:
+      self._uses = int(uses)
+    
+    if (tooLow is None) or tooLow=="":
+      self._tooLow=None
+    else:
+      self._tooLow = int(tooLow)
+      
+    if (tooHigh is None) or tooHigh=="":
+      self._tooHigh = None
+    else:
+      self._tooHigh = int(tooHigh)
+    
+    
+  def __repr__(self):
+    usesPart = self._buildStringPart("uses", self._uses)
+    tooLowPart = self._buildStringPart("tooLow", self._tooLow)
+    tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
+    
+    name=self._name
+    formula=escape(self._formula)
+    return """<heuristic name="%s" formula="%s" %s%s%s/>""" % (name,
+							       formula,
+							       usesPart,
+							       tooLowPart,
+							       tooHighPart)
+
+  def _buildStringPart(self, varName, variable):
+    if variable is not None:
+      return " %s=%d" % (varName, variable)
+    else:
+      return ""
+
+  @property
+  def name(self):
+    return self._name
+    
+  @property
+  def formula(self):
+    return self._formula
+    
+  @property
+  def uses(self):
+    return self._uses
+    
+  @property
+  def tooLow(self):
+    return self._tooLow
+    
+  @property
+  def tooHigh(self):
+    return self._tooHigh
+  
+  def forceEvolution(self):
+    formulaObj = maximaparser.parse(self.formula)
+    formulaObj.evolve()
+    self.formula=str(formulaObj)
+
+
+  
   
 class HeuristicSet(dict):
+  """Represents a set of heuristics"""
+  
   def toXmlStrings(self):
-    return ["<heuristic name=\""+name+"\" formula=\""+escape(self[name])+"\" />" for name in self]
+    return [str(self[name]) for name in self]
   
   def toXmlFile(self, filename):
     outfile = open(filename, "w")
@@ -69,9 +145,13 @@ class HeuristicSet(dict):
     for heuristicXML in xmlDOM.getElementsByTagName("heuristic"):
       name = heuristicXML.getAttribute("name")
       formula = heuristicXML.getAttribute("formula")
+      uses = heuristicXML.getAttribute("uses")
+      tooLow = heuristicXML.getAttribute("tooLow")
+      tooHigh = heuristicXML.getAttribute("tooHigh")
+      
       #Use the parser to validate (and to constant fold) the formula
       formula = str(maximaparser.parse(formula))
-      self[name] = formula
+      self[name] = Heuristic(name, formula, uses, tooLow, tooHigh)
   
   def complete(self, heuristicNames, db, N):
     """Complete the sets using the given db, so that it contains all the 
@@ -91,25 +171,70 @@ heuristics in the database  """
       
     #Complete the set
     for heuristic in missingHeuristics:
+      print "----------------------"
+      print "Heuristic %s is missing" % heuristic
       bestN = db.getBestNHeuristics(heuristic, N)
       if len(bestN) == 0:
         #No such heuristic in the DB. Do not complete the set
         #This is not a problem. It's probably a new heuristic:
         #just ignore it and it will fall back on the default implemented 
         #into the compiler
+        print "Not in the DB. Fall back on default"
+        print "----------------------"
+        #raw_input()
         continue
       formula = random.choice(bestN)
       
       if random.random() < CONF_EXPLORATION_PROBABILITY:
-        #Generete a new formula by modifying the existing one
+        #Generate a new formula by modifying the existing one
         formulaObj = maximaparser.parse(formula)
         formulaObj.evolve()
-        formula = str(formulaObj)
         
-      self[heuristic] = formula
-  
-  
-  
+        print "EVOLUTION!"
+        print "From: " + formula
+        print "To: " + str(formulaObj)
+        formula = str(formulaObj)
+      else:
+	print "No mutation for "+formula
+      print "----------------------"
+      self[heuristic] = Heuristic(heuristic, formula)
+      #raw_input()
+
+    return False
+    
+  def forceEvolution(self):
+    (name, heuristic) = random.choice(self.items())
+    heuristic.forceEvolution()
+    
+    
+  def ensureUnique(self, hSetCollection):
+    """Ensure that the current heuristic set is unique with respect to those in
+the given collection.
+
+If an identical heuristic set is found in the collection, the current one 
+is evolved until it becomes different and unique"""
+    if len(self) == 0:
+      #Empty heuristic set: always consider it as unique
+      #TODO: remove this when it will be possible to generate euristics 
+      #from scratch
+      return
+    
+    while self in hSetCollection:
+	#Prevent having two identical sets of heuristics
+	print "hSet is equal to one already present in the collection"
+	print "HSet:"
+	pp=pprint.PrettyPrinter()
+	pp.pprint(self)
+	print "Collection:"
+	pp.pprint(hSetCollection)
+	
+	self.forceEvolution()
+	
+	print "hSet has been evolved to: "
+	pp.pprint(self)
+	#raw_input()
+    
+    
     
 class HeuristicManager:
   """Manages sets of heuristics stored in a file with the following format:
@@ -126,13 +251,30 @@ class HeuristicManager:
 """
   def __init__(self, heuristicSetFileName = None):
     self._heuristicSets = []
-    if heuristicSetFileName is not None:
-      self._xml = xml.dom.minidom.parse(heuristicSetFileName)
-      
-      # Extract information
-      for hSet in self._xml.getElementsByTagName("set"):
-        self._heuristicSets.append(self._parseHeuristicSet(hSet))
+    self._loadHeuristicsFromFile(heuristicSetFileName)
+    self.resetToDefaultFromFile()
     
+      
+  def _loadHeuristicsFromFile(self, heuristicSetFileName):
+    """Load the heuristics from the specified file
+If the name is None, nothing is loaded"""
+    self._heuristicSetsInFile = []
+    
+    if heuristicSetFileName is None:
+      return
+      
+    self._xml = xml.dom.minidom.parse(heuristicSetFileName)
+    
+    # Extract information
+    for hSet in self._xml.getElementsByTagName("set"):
+      self._heuristicSetsInFile.append(self._parseHeuristicSet(hSet))
+    
+    
+  def resetToDefaultFromFile(self):
+    """Reset the set of heuristics to the one contained in the file
+specified at the construction of the HeuristicManager.
+Removes every other heuristic"""
+    self._heuristicSets = copy.deepcopy(self._heuristicSetsInFile)
     
   def _parseHeuristicSet(self, hSetXML):
     """Parses a xml heuristic set returning it as a list of pairs name-formula"""
@@ -146,10 +288,6 @@ class HeuristicManager:
   
   def allHeuristicSets(self):
     return self._heuristicSets
-    
-
-
-
 
 
 class CandidateList(list):  
@@ -187,11 +325,14 @@ class Learner:
     self._candidateSortingKey = candidateSortingKey
     self._tearDown = tearDown
     
+    hSetsFromFile = self._heuristicManager.allHeuristicSets()
+    self._db.addAsFavoriteCandidates(hSetsFromFile)
+    
     if getNeededHeuristics is None:
       #Return an empty list
-      self._getNeededHeuristcs = lambda : []
+      self._getNeededHeuristics = lambda : []
     else:
-      self._getNeededHeuristcs = getNeededHeuristics
+      self._getNeededHeuristics = getNeededHeuristics
       
     random.seed()
     
@@ -203,17 +344,56 @@ with the originalIndex field added"""
     numCandidates = len(candidates)
     count = 0
     for candidate in candidates:
-      score = (numCandidates - count) / float(numCandidates)
-      self._db.markAsUsed(candidate.heuristicSet)
+      print "Storing this heuristic set:"
+      pp=pprint.PrettyPrinter()
+      pp.pprint(candidate.heuristicSet)
+      #raw_input()
+      points = (numCandidates - count) / float(numCandidates)
       
       if candidate.assignScores:
-        self._db.increaseScore(candidate.heuristicSet, score)
+	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
+      else:
+	self._db.markAsUsed(candidate.heuristicSet)
+        
         
       count = count +1
       
     
+  def _generateAndTestHSets(self, benchmark, additionalParameters):
+    candidates = additionalParameters["candidates"]
+    neededHeuristics = additionalParameters["neededHeuristics"]
+    
+    #Generate the needed (empty) heuristicSets
+    allHSets = []
+    for i in range(self._minTrialNumber):
+      allHSets.append(HeuristicSet())
+    
+    #Complete heuristic sets
+    count=0
+    for hSet in allHSets:
+      print "Completing %s" % hSet
+      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
+      
+      previousHSets = allHSets[:count]
+      hSet.ensureUnique(previousHSets)
+      
+      count = count + 1
+    
+    
+    count = 0
+    for hSet in allHSets:
+      count = count + 1
+      currentCandidate = self._testHSet(benchmark, count, hSet, additionalParameters) 
+      candidates.append(currentCandidate)
+    
+    if candidates[0].failed:
+      raise AllCandidatesCrashError
+    
+    
     
   def learnHeuristics(self, benchmark):
+    print "Learning: %s" % benchmark
+    
     #Init variables
     candidates = CandidateList(self._candidateSortingKey)
     additionalParameters={}
@@ -224,32 +404,21 @@ with the originalIndex field added"""
       result = self._setup(benchmark, additionalParameters) 
       if result != 0:
         return result
-      
-    #Get heuristic sets
-    allHSets = self._heuristicManager.allHeuristicSets()
-    while len(allHSets) < (self._minTrialNumber): #Not enough hSets!
-      allHSets.append(HeuristicSet())
     
-    #Complete heuristic sets
-    neededHeuristics = self._getNeededHeuristcs(benchmark)
+    neededHeuristics = self._getNeededHeuristics(benchmark)
+    additionalParameters["neededHeuristics"] = neededHeuristics
+    print "Needed heuristics: %s" % neededHeuristics
     
-    for hSet in allHSets:
-      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
-    
-    count = 0
-    for hSet in allHSets:
-      count = count + 1
-      currentCandidate = self._testHSet(benchmark, count, hSet, additionalParameters) 
-      candidates.append(currentCandidate)
+    canLearn = (len(neededHeuristics) > 0)
+    if canLearn:
+      self._generateAndTestHSets(benchmark, additionalParameters)
       
     candidates.addOriginalIndex()
     candidates.sort()
     
-    if candidates[0].failed:
-      print "ALL candidates crash!"
-      return -1
+    if canLearn:
+      self.storeCandidatesDataInDB(candidates)
     
-    self.storeCandidatesDataInDB(candidates)
     
     if self._tearDown is not None:
       self._tearDown(benchmark, additionalParameters)
