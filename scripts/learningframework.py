@@ -50,12 +50,80 @@ class SuccessfulCandidate(Candidate):
   def __init__(self, heuristicSet):
     Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, originalIndex=None)
 
+
+class Heuristic(object):
+  def __init__(self, name, formula, uses=None, tooLow=None, tooHigh=None):
+    self._name = name
+    self._formula = formula
+    
+    if (uses is None) or uses=="":
+      self._uses=None
+    else:
+      self._uses = int(uses)
+    
+    if (tooLow is None) or tooLow=="":
+      self._tooLow=None
+    else:
+      self._tooLow = int(tooLow)
+      
+    if (tooHigh is None) or tooHigh=="":
+      self._tooHigh = None
+    else:
+      self._tooHigh = int(tooHigh)
+    
+    
+  def __repr__(self):
+    usesPart = self._buildStringPart("uses", self._uses)
+    tooLowPart = self._buildStringPart("tooLow", self._tooLow)
+    tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
+    
+    name=self._name
+    formula=escape(self._formula)
+    return """<heuristic name="%s" formula="%s" %s%s%s/>""" % (name,
+							       formula,
+							       usesPart,
+							       tooLowPart,
+							       tooHighPart)
+
+  def _buildStringPart(self, varName, variable):
+    if variable is not None:
+      return " %s=%d" % (varName, variable)
+    else:
+      return ""
+
+  @property
+  def name(self):
+    return self._name
+    
+  @property
+  def formula(self):
+    return self._formula
+    
+  @property
+  def uses(self):
+    return self._uses
+    
+  @property
+  def tooLow(self):
+    return self._tooLow
+    
+  @property
+  def tooHigh(self):
+    return self._tooHigh
+  
+  def forceEvolution(self):
+    formulaObj = maximaparser.parse(self.formula)
+    formulaObj.evolve()
+    self.formula=str(formulaObj)
+
+
+  
   
 class HeuristicSet(dict):
   """Represents a set of heuristics"""
   
   def toXmlStrings(self):
-    return ["<heuristic name=\""+name+"\" formula=\""+escape(self[name])+"\" />" for name in self]
+    return [str(self[name]) for name in self]
   
   def toXmlFile(self, filename):
     outfile = open(filename, "w")
@@ -77,9 +145,13 @@ class HeuristicSet(dict):
     for heuristicXML in xmlDOM.getElementsByTagName("heuristic"):
       name = heuristicXML.getAttribute("name")
       formula = heuristicXML.getAttribute("formula")
+      uses = heuristicXML.getAttribute("uses")
+      tooLow = heuristicXML.getAttribute("tooLow")
+      tooHigh = heuristicXML.getAttribute("tooHigh")
+      
       #Use the parser to validate (and to constant fold) the formula
       formula = str(maximaparser.parse(formula))
-      self[name] = formula
+      self[name] = Heuristic(name, formula, uses, tooLow, tooHigh)
   
   def complete(self, heuristicNames, db, N):
     """Complete the sets using the given db, so that it contains all the 
@@ -125,16 +197,14 @@ heuristics in the database  """
       else:
 	print "No mutation for "+formula
       print "----------------------"
-      self[heuristic] = formula
+      self[heuristic] = Heuristic(heuristic, formula)
       #raw_input()
 
     return False
     
   def forceEvolution(self):
-    (name, formula) = random.choice(self.items())
-    formulaObj = maximaparser.parse(formula)
-    formulaObj.evolve()
-    self[name]=str(formulaObj)
+    (name, heuristic) = random.choice(self.items())
+    heuristic.forceEvolution()
     
     
   def ensureUnique(self, hSetCollection):
@@ -278,11 +348,13 @@ with the originalIndex field added"""
       pp=pprint.PrettyPrinter()
       pp.pprint(candidate.heuristicSet)
       #raw_input()
-      score = (numCandidates - count) / float(numCandidates)
-      self._db.markAsUsed(candidate.heuristicSet)
+      points = (numCandidates - count) / float(numCandidates)
       
       if candidate.assignScores:
-        self._db.increaseScore(candidate.heuristicSet, score)
+	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
+      else:
+	self._db.markAsUsed(candidate.heuristicSet)
+        
         
       count = count +1
       

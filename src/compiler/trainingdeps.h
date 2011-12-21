@@ -118,14 +118,22 @@ public:
         ++i) {
       const std::string name = i->first;
       const HeuristicPtr& heuristic = i->second;
-      addHeuristic(name, heuristic->usedFormula()->toCppString());
+      addHeuristic(name, heuristic);
     }
   }
   
-  void addHeuristic(const std::string name, const std::string formula) {
+  void addHeuristic(const std::string name, const HeuristicPtr& heuristic) {
+    std::string formula = heuristic->usedFormula()->toCppString();
+    unsigned int uses = heuristic->uses();
+    unsigned int tooLow = heuristic->tooLow();
+    unsigned int tooHigh = heuristic->tooHigh();
+    
     _os << "  <heuristic";
     _os << " name=\"" << name << "\"";
     _os << " formula=\"" << jalib::escapeXML(formula) << "\"";
+    _os << " uses=\"" << jalib::escapeXML(jalib::XToString(uses)) << "\"";
+    _os << " tooHigh=\"" << jalib::escapeXML(jalib::XToString(tooHigh)) << "\"";
+    _os << " tooLow=\"" << jalib::escapeXML(jalib::XToString(tooLow)) << "\"";
     _os << " />\n";
   }
   
