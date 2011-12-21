@@ -43,22 +43,41 @@ public:
   Heuristic(const std::string formula) :
         _formula(MaximaWrapper::instance().runCommandSingleOutput(formula)),
         _min( -std::numeric_limits<double>::infinity()),
-        _max( std::numeric_limits<double>::infinity()) {}
-    
+        _max( std::numeric_limits<double>::infinity()),
+        _uses(0),
+        _tooLow(0),
+        _tooHigh(0) {}
+  
+  /** Return the formula that has actually been used for this heuristic.
+   * This is either the formula itself or, if it was a constant and lower than 
+   * _min or higher than _max, the value of _min or _max respectively */
   FormulaPtr usedFormula() const;
   
-  double eval (const ValueMap featureValues=ValueMap()) const;
+  /** Evaluate the heuristic using the given features. If the result is lower 
+   * than _min or higher than _max, return _min or _max respectively. 
+   * As a side effect, increase the usage count of the heuristic, and, if needed
+   * mark the heuristic as being evaluated out of bounds */
+  double eval (const ValueMap featureValues=ValueMap());
+  
+  unsigned int uses() const { return _uses; }
+  unsigned int tooLow() const { return _tooLow; }
+  unsigned int tooHigh() const { return _tooHigh; }
   
   void setMin(const double min) { _min = min; }
   void setMax(const double max) { _max = max; }
   
 private:
+  /** Eval the heuristic using the given features. Return the exact result,
+   * not limited by _max and _min */
   double evalWithoutLimits(const ValueMap featureValues) const;
   
 private:
   FormulaPtr _formula;
   double _min;
   double _max;
+  unsigned int _uses;
+  unsigned int _tooLow;
+  unsigned int _tooHigh;
 };
 
 
