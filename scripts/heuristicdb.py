@@ -164,6 +164,19 @@ class HeuristicDB:
     result = [row[0] for row in cur.fetchall()]
     cur.close()
     return result
+  
+  
+  def getHeuristicsFinalScoreByKind(self, kind):
+    """Return a dictionary {formula : finalScore}, 
+    where finalScore=score/useCount, for all the heuristics of the given kind"""
+    cur = self.__db.cursor()
+    query = "SELECT formula, score/useCount FROM Heuristic "\
+	    "JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID " \
+	    "WHERE HeuristicKind.name=? "
+    cur.execute(query, (kind,))
+    result = {row[0]:row[1] for row in cur.fetchall()}
+    cur.close()
+    return result
 
     
   def addAsFavoriteCandidates(self, heuristicSets, maximumScore=1):
@@ -172,3 +185,6 @@ database, with maximum score, so that they will be selected with maximum likelih
     for hSet in heuristicSets:
       self.markAsUsed(hSet, 1)
       self.addToScore(hSet, maximumScore, weightedScore=False)
+      
+  def close(self):
+    self.__db.close()
