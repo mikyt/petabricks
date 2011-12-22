@@ -105,13 +105,13 @@ class Heuristic(object):
     
   @property
   def tooLow(self):
-    if tooLow is None:
+    if self._tooLow is None:
       return 0
     return self._tooLow
     
   @property
   def tooHigh(self):
-    if tooHigh is None:
+    if self._tooHigh is None:
       return 0
     return self._tooHigh
   
