@@ -174,7 +174,9 @@ class HeuristicDB:
 	    "JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID " \
 	    "WHERE HeuristicKind.name=? "
     cur.execute(query, (kind,))
-    result = {row[0]:row[1] for row in cur.fetchall()}
+    result = {}
+    for row in cur.fetchall():
+      result[row[0]] = row[1]
     cur.close()
     return result
 
