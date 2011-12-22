@@ -11,11 +11,13 @@ import pbutil
 import sgatuner
 import traceback
 import subprocess
+import heuristicdb
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
 CONF_TIMEOUT=5*60
 STATIC_INPUT_PREFIX="test"
+HEURISTIC_KINDS = ["UserRule_blockNumber", "UnrollingOptimizer_unrollingNumber"]
 
 def parseCmdline(petabricks_path):
   parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
@@ -85,8 +87,64 @@ If staticInputName is specified, such input is used. If generateStaticInput is T
   
   return avgExecutionTime
   
-  
 
+class HeuristicsGraphDataGenerator(object):
+  def __init__(self, heuristicKinds):
+    self._db = heuristicdb.HeuristicDB()
+    self._heuristicKinds = heuristicKinds
+    
+    #Output files (one for each heuristic kind)
+    self._out = {}
+    
+    #Ordered lists of heuristics (one for each kind)
+    self._heurList = {}
+    
+    for kind in self._heuristicKinds:
+      self._heurList[kind] = []
+      self._out[kind] = open(kind+".dat", "w")
+  
+  
+  def outputLineByKind(self, programName, heuristicKind):
+    outFile = self._out[heuristicKind]
+    heurList = self._heurList[heuristicKind]
+    
+    outFile.write(programName)
+    
+    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind)
+    
+    #Add new heuristics to the list keeping the order of the previous ones
+    keys = scores.keys()
+    newHeurList = filter(lambda x: x not in heurList, keys)
+    
+    heurList.extend(newHeurList)
+    print heurList
+    
+    #Output the line
+    for heuristic in heurList:
+      outFile.write("\t")
+      try:
+	outFile.write(str(scores[heuristic]))
+      except KeyError:
+	#No score available for the current heuristic at this time
+	outFile.write("-")
+    
+    outFile.write("\n")
+    outFile.flush()
+  
+  def outputLine(self, programName):
+    """Outputs one line for each heuristic kind file"""
+    for kind in self._heuristicKinds:
+      self.outputLineByKind(programName, kind)
+      
+    
+  def close(self):
+    self._db.close()
+    for kind in self._heuristicKinds:
+      self._out[kind].close()
+    
+  
+  
+  
   
 def main():
   """The body of the program"""
@@ -105,10 +163,13 @@ def main():
   testProgram=os.path.abspath(args[0])
   testBinary = os.path.splitext(testProgram)[0]
   
+  #Create objects
   compiler = learningcompiler.LearningCompiler(pbc, 
                                       heuristicSetFileName = options.heuristics,
                                       n=options.maxtuningsize, 
                                       maxTuningTime=options.maxtuningtime)
+  
+  hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
   
   examples_path= os.path.join(petabricks_path, "examples")
   
@@ -134,6 +195,8 @@ def main():
     sys.exit(-1)
   
   resultfile.write(""""INITIAL" %s\n""" % res)
+  
+  hgdatagen.outputLine("INITIAL")
   
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
@@ -168,10 +231,12 @@ def main():
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
     resultfile.flush()
+    
+    hgdatagen.outputLine(trainingprogram)
 
   print "Results written to " + options.resultfile
-
-
+  
+  hgdatagen.close()
   
 if __name__ == "__main__":
   main()
