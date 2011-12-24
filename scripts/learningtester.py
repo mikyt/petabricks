@@ -96,14 +96,71 @@ class HeuristicsGraphDataGenerator(object):
     #Output files (one for each heuristic kind)
     self._out = {}
     
+    #Graph generation scripts (one for each heuristic kind)
+    self._script = {}
+    
     #Ordered lists of heuristics (one for each kind)
     self._heurList = {}
     
     for kind in self._heuristicKinds:
       self._heurList[kind] = []
-      self._out[kind] = open(kind+".dat", "w")
+      datafile = self._dataFileName(kind)
+      self._out[kind] = open(datafile, "w")
+      self._script[kind] = self._initScript(kind)
   
+  def _dataFileName(self, heuristicKind):
+    return heuristicKind + ".dat"
   
+  def _initScript(self, heuristicKind):
+    script = open(heuristicKind+".gnuplot", "w")
+    script.write("set xtics rotate by 90\n")
+    script.write("set key outside\n")
+    return script
+    
+  def _finalizeScript(self, heuristicKind):
+    script = self._script[heuristicKind]
+    
+    script.write("\n")
+    script.close()
+    
+    
+  def _plotFirstDataColumn(self, kind, heuristic):
+    datafile = self._dataFileName(kind)
+    title = heuristic
+    initialplotcmd="""plot "%s" using 2:xticlabels(1) smooth csplines title "%s" """ % (datafile, title)
+    self._script[kind].write(initialplotcmd)
+    
+    
+  def _updateScript(self, heuristicKind, newHeurList):
+    """Update the generation script with the lines needed to plot 
+    the new heuristics"""
+    if len(newHeurList)==0:
+      #Nothing to be done
+      return
+    
+    lastPlottedColumn = len(self._heurList[heuristicKind])+1
+    
+    if lastPlottedColumn==1:
+      self._plotFirstDataColumn(heuristicKind, newHeurList[0])
+      column = 2
+      toBePlotted = newHeurList[1:]
+    else:
+      column = lastPlottedColumn
+      toBePlotted = newHeurList
+    
+    #Plot every other column
+    datafile = self._dataFileName(heuristicKind)
+    script = self._script[heuristicKind]
+    for heur in toBePlotted:
+      column = column + 1
+      title = heur
+      plotcmd=""", \\\n     "%s" using %d:xticlabels(1) smooth csplines title "%s" """ % (datafile, column, title)
+      script.write(plotcmd)
+      
+    script.flush()
+
+    
+    
   def outputLineByKind(self, programName, heuristicKind):
     outFile = self._out[heuristicKind]
     heurList = self._heurList[heuristicKind]
@@ -116,8 +173,8 @@ class HeuristicsGraphDataGenerator(object):
     keys = scores.keys()
     newHeurList = filter(lambda x: x not in heurList, keys)
     
+    self._updateScript(heuristicKind, newHeurList)
     heurList.extend(newHeurList)
-    print heurList
     
     #Output the line
     for heuristic in heurList:
@@ -130,6 +187,7 @@ class HeuristicsGraphDataGenerator(object):
     
     outFile.write("\n")
     outFile.flush()
+    
   
   def outputLine(self, programName):
     """Outputs one line for each heuristic kind file"""
@@ -141,6 +199,9 @@ class HeuristicsGraphDataGenerator(object):
     self._db.close()
     for kind in self._heuristicKinds:
       self._out[kind].close()
+      self._finalizeScript(kind)
+      
+    
     
   
   
