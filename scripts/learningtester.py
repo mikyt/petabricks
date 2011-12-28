@@ -18,6 +18,7 @@ from optparse import OptionParser
 CONF_TIMEOUT=5*60
 STATIC_INPUT_PREFIX="test"
 HEURISTIC_KINDS = ["UserRule_blockNumber", "UnrollingOptimizer_unrollingNumber"]
+MAX_PRINTED_HEURISTICS=10
 
 def parseCmdline(petabricks_path):
   parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
@@ -113,9 +114,17 @@ class HeuristicsGraphDataGenerator(object):
   
   def _initScript(self, heuristicKind):
     script = open(heuristicKind+".gnuplot", "w")
-    script.write("set xtics rotate by 90\n")
+    
+    script.write("set xtics rotate by -90\n")
     script.write("set key outside\n")
+    script.write("""set xtics out font "Arial,8"\n""")
+
+    #Plot something random to force gnuplot to use the new settings
+    #It will be overwritten by the real plot
+    script.write("plot x\n") 
+
     return script
+    
     
   def _finalizeScript(self, heuristicKind):
     script = self._script[heuristicKind]
@@ -127,7 +136,8 @@ class HeuristicsGraphDataGenerator(object):
   def _plotFirstDataColumn(self, kind, heuristic):
     datafile = self._dataFileName(kind)
     title = heuristic
-    initialplotcmd="""plot "%s" using 2:xticlabels(1) smooth csplines title "%s" """ % (datafile, title)
+    initialplotcmd="""plot "%s" using 2:xticlabels(1) with lines notitle, \\\n""" \
+                   """     "%s" using 2:xticlabels(1) title "%s" """ % (datafile, datafile, title)
     self._script[kind].write(initialplotcmd)
     
     
@@ -154,7 +164,9 @@ class HeuristicsGraphDataGenerator(object):
     for heur in toBePlotted:
       column = column + 1
       title = heur
-      plotcmd=""", \\\n     "%s" using %d:xticlabels(1) smooth csplines title "%s" """ % (datafile, column, title)
+      plotcmd=""", \\\n     "%s" using %d:xticlabels(1) with lines notitle """ \
+              """, \\\n     "%s" using %d:xticlabels(1) title "%s" """
+      plotcmd = plotcmd % (datafile, column, datafile, column, title)
       script.write(plotcmd)
       
     script.flush()
@@ -167,7 +179,7 @@ class HeuristicsGraphDataGenerator(object):
     
     outFile.write(programName)
     
-    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind)
+    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind, MAX_PRINTED_HEURISTICS)
     
     #Add new heuristics to the list keeping the order of the previous ones
     keys = scores.keys()
