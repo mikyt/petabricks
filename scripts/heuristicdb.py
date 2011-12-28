@@ -166,13 +166,16 @@ class HeuristicDB:
     return result
   
   
-  def getHeuristicsFinalScoreByKind(self, kind):
+  def getHeuristicsFinalScoreByKind(self, kind, bestN=None):
     """Return a dictionary {formula : finalScore}, 
     where finalScore=score/useCount, for all the heuristics of the given kind"""
     cur = self.__db.cursor()
     query = "SELECT formula, score/useCount FROM Heuristic "\
 	    "JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID " \
 	    "WHERE HeuristicKind.name=? "
+    if bestN is not None:
+      query=query+" ORDER BY score/useCount DESC LIMIT "+str(int(bestN))
+      
     cur.execute(query, (kind,))
     result = {}
     for row in cur.fetchall():
