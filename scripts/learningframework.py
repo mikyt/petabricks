@@ -362,14 +362,48 @@ with the originalIndex field added"""
         
       count = count +1
       
+  def _generateHSetsByElitism(self, allHSets, neededHeuristics, eliteSize):
+    """Generate "eliteSize" heuristic sets by elitism, that is by
+getting the current best heuristics, without modifying them"""
+
+    #Get the best N heuristics of each kind
+    #TODO: use information about the best heuristic sets!!!
+    heuristicLists = {}
+    for kind in neededHeuristics:
+      heuristicLists[kind] = self._db.getBestNHeuristics(kind, eliteSize)
     
+    #Build the sets
+    try:
+      for i in range(eliteSize):
+	newSet = HeuristicSet()
+      
+	for kind in neededHeuristics:
+	  newSet[kind] = heuristicLists[kind][i]
+	
+	allHSets.append(newSet)
+	print "ELITE: %s", newSet
+	
+    except IndexError:
+      #One of the lists is too small: stop here
+      pass
+    
+    return allHSets
+      
+      
+      
+  
   def _generateAndTestHSets(self, benchmark, additionalParameters):
     candidates = additionalParameters["candidates"]
     neededHeuristics = additionalParameters["neededHeuristics"]
     
-    #Generate the needed (empty) heuristicSets
     allHSets = []
-    for i in range(self._minTrialNumber):
+    
+    self._generateHSetsByElitism(allHSets, neededHeuristics, 1)
+    numGenerated = len(allHSets)
+    
+    #Generate the ramaining needed (empty) heuristicSets
+    numNeeded = self._minTrialNumber - numGenerated
+    for i in range(numNeeded):
       allHSets.append(HeuristicSet())
     
     #Complete heuristic sets
