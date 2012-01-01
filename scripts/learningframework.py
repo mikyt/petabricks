@@ -357,7 +357,8 @@ with the originalIndex field added"""
       if candidate.assignScores:
 	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
       else:
-	self._db.markAsUsed(candidate.heuristicSet)
+	  assert candidate.failed
+	  self._db.markAsUsed(candidate.heuristicSet, uses=1)
         
         
       count = count +1
