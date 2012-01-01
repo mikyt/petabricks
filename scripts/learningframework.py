@@ -125,6 +125,10 @@ class Heuristic(object):
   
 class HeuristicSet(dict):
   """Represents a set of heuristics"""
+  def __setitem__(self, key, value):
+    if not isinstance(value, Heuristic):
+      raise TypeError
+    super(HeuristicSet, self).__setitem__(key, value)
   
   def toXmlStrings(self):
     return [str(self[name]) for name in self]
@@ -371,7 +375,7 @@ getting the current best heuristics, without modifying them"""
     #TODO: use information about the best heuristic sets!!!
     heuristicLists = {}
     for kind in neededHeuristics:
-      heuristicLists[kind] = self._db.getBestNHeuristics(kind, eliteSize)
+      heuristicLists[kind] = [Heuristic(kind, formula) for formula in self._db.getBestNHeuristics(kind, eliteSize)]
     
     #Build the sets
     try:
