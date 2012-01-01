@@ -12,6 +12,7 @@ import sgatuner
 import traceback
 import subprocess
 import heuristicdb
+import logging
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
@@ -19,6 +20,24 @@ CONF_TIMEOUT=5*60
 STATIC_INPUT_PREFIX="test"
 HEURISTIC_KINDS = ["UserRule_blockNumber", "UnrollingOptimizer_unrollingNumber"]
 MAX_PRINTED_HEURISTICS=10
+
+logger = logging.getLogger(__name__)
+
+
+def configureLogging(errorfile):
+  # create file handler which logs error messages
+  fh = logging.FileHandler(errorfile)
+  fh.setLevel(logging.WARNING)
+  # create formatter and add it to the handlers
+  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+  fh.setFormatter(formatter)
+  # create console handler
+  ch = logging.StreamHandler()
+  ch.setLevel(logging.WARNING)
+  # add the handlers to logger
+  logger.addHandler(ch)
+  logger.addHandler(fh)
+  
 
 def parseCmdline(petabricks_path):
   parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
@@ -39,9 +58,13 @@ def parseCmdline(petabricks_path):
 	    help="maximum time (in seconds) to be spent tuning the test program",
 	    default=CONF_TIMEOUT)
   parser.add_option("--resultfile",
-		type="string",
-		help="file containing the results in gnuplot-compatible format",
-		default="training-results.dat")
+                type="string",
+                help="file containing the results in gnuplot-compatible format",
+                default="training-results.dat")
+  parser.add_option("--errorfile",
+                type="string",
+                help="file containing the log of errors",
+                default="error-log.dat")
   parser.add_option("--maxtuningsize",
 		type="int",
 		help="maximum size of the input to be used tuning a candidate",
@@ -221,6 +244,7 @@ class HeuristicsGraphDataGenerator(object):
   
 def main():
   """The body of the program"""
+  
   script_path = sys.path[0]
   petabricks_path = os.path.join(script_path, "../")
   petabricks_path = os.path.normpath(petabricks_path)
@@ -233,6 +257,8 @@ def main():
     print "No test program specified"
     exit(-1)
   
+  configureLogging(options.errorfile)
+  
   testProgram=os.path.abspath(args[0])
   testBinary = os.path.splitext(testProgram)[0]
   
@@ -244,10 +270,13 @@ def main():
   
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
   
+  logging.basicConfig(filename=options.errorfile, filemode='w')
+  
   examples_path= os.path.join(petabricks_path, "examples")
   
   trainingset = open(options.trainingset, "r")
   resultfile = open(options.resultfile, "w")
+  
   
   print "Compiling and testing the initial version of the test program"
   try:
@@ -259,12 +288,7 @@ def main():
 		       STATIC_INPUT_PREFIX,
 		       generateStaticInput=True)
   except:
-    sys.stderr.write("ERROR compiling and testing the test program:\n")
-    einfo = sys.exc_info()
-    print einfo[0]
-    print einfo[1]
-    traceback.print_tb(einfo[2])
-    res = CONF_TIMEOUT
+    logger.exception("ERROR compiling and testing the test program:\n")
     sys.exit(-1)
   
   resultfile.write(""""INITIAL" %s\n""" % res)
@@ -293,13 +317,10 @@ def main():
 		       options.maxtesttime,
 		       STATIC_INPUT_PREFIX)
     except pbutil.TimingRunTimeout:
+      logger.exception("Timeout!")
       res = CONF_TIMEOUT
     except:
-      sys.stderr.write("Irrecoverable error while learning:\n")
-      einfo = sys.exc_info()
-      print einfo[0]
-      print einfo[1]
-      traceback.print_tb(einfo[2])
+      logger.exception("Irrecoverable error while learning:\n")
       res=-1
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
