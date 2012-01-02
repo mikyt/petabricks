@@ -1063,6 +1063,8 @@ void petabricks::UserRule::generateTrampCode(Transform& trans, CodeGenerator& o,
       blockNumberHeur->setMin(2);
       ValueMap features;
       features["ruleOpsNumber"] = _bodyir[flavor]->opsNumber();
+      features["functionCallNumber"] = _bodyir[flavor]->subnodeCount(RIRNode::EXPR_CALL);
+      features["loopNumber"] = _bodyir[flavor]->subnodeCount(RIRNode::STMT_LOOP);
       unsigned int blockNumber = blockNumberHeur->eval(features); /**< The number of blocks the loop will be
                                                                     * splitted into */
       JTRACE("LOOP BLOCKING")(blockNumber);

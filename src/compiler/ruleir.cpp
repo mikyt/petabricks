@@ -246,6 +246,11 @@ petabricks::RIRExprCopyRef& petabricks::RIRStmt::part(int n) {
   return *i;
 }
 
-unsigned int petabricks::RIRBlockStmt::opsNumber() const { 
-    return _block->opsNumber();
+unsigned int petabricks::RIRBlockStmt::subnodeCount(Type kind) const {
+  unsigned int count = 0;
+  if (type() == kind) {
+    count++;
+  }
+  count += _block->subnodeCount(kind);
+  return count;
 }
