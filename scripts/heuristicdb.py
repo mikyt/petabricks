@@ -96,6 +96,10 @@ class HeuristicDB:
     
   
   def _computeScore(self, heuristic, points):
+    assert heuristic.uses is not None
+    assert heuristic.tooLow is not None
+    assert heuristic.tooHigh is not None
+    
     uses = heuristic.uses
     outofbounds = heuristic.tooLow + heuristic.tooHigh
     return points * (uses - outofbounds)
