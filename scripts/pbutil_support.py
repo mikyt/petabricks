@@ -33,7 +33,7 @@ def timeoutKiller(subproc, timeout):
     
 def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=None, timeout=None, defaultHeuristics=False):
     if not os.path.isfile(src):
-      raise IOError()
+      raise IOError("%s is not a file" % src)
     
     #Build the command
     cmd=[pbc]
