@@ -105,14 +105,10 @@ class Heuristic(object):
     
   @property
   def tooLow(self):
-    if self._tooLow is None:
-      return 0
     return self._tooLow
     
   @property
   def tooHigh(self):
-    if self._tooHigh is None:
-      return 0
     return self._tooHigh
   
   def forceEvolution(self):
@@ -359,10 +355,11 @@ with the originalIndex field added"""
       points = (numCandidates - count) / float(numCandidates)
       
       if candidate.assignScores:
+	assert not candidate.failed
 	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
       else:
-	  assert candidate.failed
-	  self._db.markAsUsed(candidate.heuristicSet, uses=1)
+	assert candidate.failed
+	self._db.markAsUsed(candidate.heuristicSet, uses=1)
         
         
       count = count +1

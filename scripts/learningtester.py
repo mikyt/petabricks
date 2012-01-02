@@ -319,9 +319,13 @@ def main():
     except pbutil.TimingRunTimeout:
       logger.exception("Timeout!")
       res = CONF_TIMEOUT
+    except AllCandidatesCrashError:
+      logger.error("All candidates crash while compiling: %s", trainingprogram)
+      res=-1
     except:
       logger.exception("Irrecoverable error while learning:\n")
       res=-1
+      sys.exit(-2)
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
     resultfile.flush()

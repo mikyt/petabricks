@@ -11,6 +11,7 @@ import tunerwarnings
 import shutil
 import sys
 import sgatuner
+import logging
 from candidatetester import Candidate
 
 #------------------ Config --------------------
@@ -19,6 +20,8 @@ CONF_DELETE_TEMP_DIR = True
 CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #----------------------------------------------
+
+logger = logging.getLogger(__name__)
 
 def candidateKey(candidate):
   """Generates a comparison key for a candidate.
@@ -92,8 +95,8 @@ following attributes:
       #file have been used, but they had the compilation fail.
       #Their score is not increased, but they are marked as used
       #(and therefore they are penalized)
-      print "Compile FAILED while using heuristic set #"+str(count)+": ",
-      print hSet
+      logger.warning("Compile FAILED while using heuristic set #%d:", count)
+      logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = False)
       
         
@@ -105,7 +108,8 @@ following attributes:
       candidate = candidates[-1]
       
     except tunerwarnings.AlwaysCrashes:
-      print "Candidate "+str(count)+" always crashes!"
+      logger.warning("Candidate %d always crashes during tuning with hset:", count)
+      logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = True)
       
     #Store the actually used hSet inside the candidate
@@ -161,7 +165,7 @@ following attributes:
 
       
     except tunerwarnings.AlwaysCrashes:
-      print "Compilation with default heuristics always crashes!"
+      logger.error("Compilation with default heuristics always crashes!")
       #Add an empty entry for the candidate
       currentCandidate = learningframework.FailedCandidate()
       candidates.append(currentCandidate)
