@@ -319,7 +319,7 @@ def main():
     except pbutil.TimingRunTimeout:
       logger.exception("Timeout!")
       res = CONF_TIMEOUT
-    except AllCandidatesCrashError:
+    except learningframework.AllCandidatesCrashError:
       logger.error("All candidates crash while compiling: %s", trainingprogram)
       res=-1
     except:
