@@ -5,6 +5,7 @@ program.
 The run of the test program is timed and a plot of the times is generated"""
 
 import learningcompiler
+import learningframework
 import os
 import sys
 import pbutil
