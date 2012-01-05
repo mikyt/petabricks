@@ -12,16 +12,16 @@ import shutil
 import sys
 import sgatuner
 import logging
-from candidatetester import Candidate
 
 #------------------ Config --------------------
-CONF_MAX_TIME = 60 #Seconds
+CONF_MAX_TIME = 60  # Seconds
 CONF_DELETE_TEMP_DIR = True
 CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #----------------------------------------------
 
 logger = logging.getLogger(__name__)
+
 
 def candidateKey(candidate):
   """Generates a comparison key for a candidate.
@@ -31,9 +31,8 @@ then by average execution time of the biggest dimension (the lower the better)""
     return (float('inf'), float('inf'))
   numDimensions = len(candidate.metrics[0])
   executionTime = candidate.metrics[0][2**(numDimensions-1)].mean()
-  return (1/numDimensions, executionTime)
-  
-  
+  return (1 / numDimensions, executionTime)
+
 
 class LearningCompiler:
   def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, maxTuningTime=CONF_MAX_TIME):
@@ -43,54 +42,54 @@ class LearningCompiler:
                                               self.setup,
                                               self.tearDown,
                                               self.getNeededHeuristics)
-    self._pbcExe = pbcExe    
+    self._pbcExe = pbcExe
     self._jobs = jobs
     self._n = n
     self._maxTuningTime = maxTuningTime
-    
-    
+
+
   def compileLearningHeuristics(self, benchmark, finalBinary = None):
     self._finalBinary = finalBinary
     self._neededHeuristics={}
-    
+
     return self._learner.learnHeuristics(benchmark)
-    
-  
+
+
   def testHSet(self, benchmark, count, hSet, additionalParameters):
-    """Return the object representing a tested candidate, with (at least) the 
+    """Return the object representing a tested candidate, with (at least) the
 following attributes:
-  
+
   * failed (bool): has the candidate failed the compilation/testing process?
   * assignScores (bool): should the score be assigned to the candidate normally
                          or should we just mark it as used (thus penalizing it)
-  * heuristicSet (HeuristicSet): the set of heuristics that generated the 
+  * heuristicSet (HeuristicSet): the set of heuristics that generated the
                                  program"""
     candidates=[]
     candidate = None
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]
-    
+
     #Define more file names
-    
+
     outDir = os.path.join(basesubdir, str(count))
     if not os.path.isdir(outDir):
       #Create the output directory
       os.makedirs(outDir)
-    binary= os.path.join(outDir, basename)  
-    
+    binary= os.path.join(outDir, basename)
+
     heuristicsFile= os.path.join(outDir, CONF_HEURISTIC_FILE_NAME)
     hSet.toXmlFile(heuristicsFile)
-    
-    status = pbutil_support.compileBenchmark(self._pbcExe, 
-                                     benchmark, 
-                                     binary = binary, 
-                                     heuristics = heuristicsFile, 
-                                     jobs = self._jobs, 
+
+    status = pbutil_support.compileBenchmark(self._pbcExe,
+                                     benchmark,
+                                     binary = binary,
+                                     heuristics = heuristicsFile,
+                                     jobs = self._jobs,
                                      timeout = CONF_TIMEOUT)
     if status != 0:
       #Compilation has failed!
       #Take the data about the heuristics from the input heuristics file
-      #instead of the info file (because there no such file!). 
+      #instead of the info file (because there no such file!).
       #We are not sure that all the heuristics in the input
       #file have been used, but they had the compilation fail.
       #Their score is not increased, but they are marked as used
@@ -98,38 +97,38 @@ following attributes:
       logger.warning("Compile FAILED while using heuristic set #%d:", count)
       logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = False)
-      
-        
+
+
     #Autotune
     try:
       sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
-      
+
       #Candidate has not failed: mark as such
       candidate = candidates[-1]
-      
+
     except tunerwarnings.AlwaysCrashes:
       logger.warning("Candidate %d always crashes during tuning with hset:", count)
       logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = True)
-      
+
     #Store the actually used hSet inside the candidate
-    infoFile = os.path.join(basesubdir, 
-                            str(count), 
+    infoFile = os.path.join(basesubdir,
+                            str(count),
                             basename+".info")
     hSet = learningframework.HeuristicSet()
     hSet.importFromXml(infoFile)
-   
+
     candidate.heuristicSet = hSet
     candidate.failed = False
     candidate.assignScores = True
-   
-    return candidate
-  
 
-    
+    return candidate
+
+
+
   def setup(self, benchmark, additionalParameters):
     candidates = additionalParameters["candidates"]
-    
+
     #Define file names
     path, basenameExt = os.path.split(benchmark)
     if path == "":
@@ -139,37 +138,38 @@ following attributes:
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
     additionalParameters["path"] = path
-    
+
     #Compile with default heuristics
     outDir = os.path.join(basesubdir, "0")
     if not os.path.isdir(outDir):
       #Create the output directory
       os.makedirs(outDir)
-    binary= os.path.join(outDir, basename)  
-    status = pbutil_support.compileBenchmark(self._pbcExe, 
-                                   benchmark, 
-                                   binary = binary, 
-                                   jobs = self._jobs, 
-                                   defaultHeuristics = True)  
+    binary= os.path.join(outDir, basename)
+    status = pbutil_support.compileBenchmark(self._pbcExe,
+                                   benchmark,
+                                   binary = binary,
+                                   jobs = self._jobs,
+                                   defaultHeuristics = True)
     if status != 0:
-      print "Compile FAILED with default heuristics - Compilation aborted"
+      logger.error("Compile FAILED with default heuristics - "
+                   "Compilation aborted")
       return status
-      
+
     try:
       sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
-      
+
       #Candidate has not failed: mark as such
       currentCandidate = candidates[-1]
       currentCandidate.failed = False
       currentCandidate.assignScores = True
 
-      
+
     except tunerwarnings.AlwaysCrashes:
       logger.error("Compilation with default heuristics always crashes!")
       #Add an empty entry for the candidate
       currentCandidate = learningframework.FailedCandidate()
       candidates.append(currentCandidate)
-    
+
     #Get the full set of used heuristics
     infoFile = binary+".info"
     currentDefaultHSet = learningframework.HeuristicSet()
@@ -177,24 +177,24 @@ following attributes:
     currentCandidate.heuristicSet = currentDefaultHSet
 
     #Store the list of needed heuristics for the current benchmark
-    self._neededHeuristics[benchmark] = currentDefaultHSet.keys() 
-      
+    self._neededHeuristics[benchmark] = currentDefaultHSet.keys()
+
     return 0
-    
-  
+
+
   def getNeededHeuristics(self, benchmark):
     return self._neededHeuristics[benchmark]
-    
-    
+
+
   def tearDown(self, benchmark, additionalParameters):
     candidates = additionalParameters["candidates"]
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]
     path = additionalParameters["path"]
-    
+
     bestIndex = candidates[0].originalIndex
-    print "The best candidate is: "+str(bestIndex)
-  
+    logger.info("The best candidate is: %d", bestIndex)
+
     #Move every file to the right place
     bestSubDir = os.path.join(basesubdir, str(bestIndex))
     #  compiled program:
@@ -223,15 +223,15 @@ following attributes:
       bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
       finalHeurFile = finalBin+".heur"
       shutil.move(bestHeurFile, finalHeurFile)
-    
+
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:
       shutil.rmtree(basesubdir)
-      
-      
 
-      
-      
+
+
+
+
 #TEST
 if __name__ == "__main__":
   #basedir="/afs/csail.mit.edu/u/m/mtartara/programs/petabricks/"

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """This program verifies the effectiveness of the heuristic learning process by
-running a set of training programs and, after each of them, running a test 
+running a set of training programs and, after each of them, running a test
 program.
 The run of the test program is timed and a plot of the times is generated"""
 
@@ -10,45 +10,56 @@ import os
 import sys
 import pbutil
 import sgatuner
-import traceback
 import subprocess
 import heuristicdb
 import logging
 from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
-CONF_TIMEOUT=5*60
-STATIC_INPUT_PREFIX="test"
-HEURISTIC_KINDS = ["UserRule_blockNumber", "UnrollingOptimizer_unrollingNumber"]
-MAX_PRINTED_HEURISTICS=10
+CONF_TIMEOUT = 5 * 60
+STATIC_INPUT_PREFIX = "test"
+HEURISTIC_KINDS = ["UserRule_blockNumber",
+                   "UnrollingOptimizer_unrollingNumber"]
+MAX_PRINTED_HEURISTICS = 10
 
 logger = logging.getLogger(__name__)
 
+class NonRootFilter:
+    "Allows everything not coming from the root logger itself to be logged"
+    def filter(self, record):
+        """The function implementing the filter"""
+        if record.name == "root":
+            # Don't log
+            return 0
+        return 1
 
 def configureLogging(errorfile):
-  # create file handler which logs error messages
-  fh = logging.FileHandler(errorfile)
-  fh.setLevel(logging.WARNING)
-  # create formatter and add it to the handlers
-  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-  fh.setFormatter(formatter)
-  # create console handler
-  ch = logging.StreamHandler()
-  ch.setLevel(logging.WARNING)
-  # add the handlers to logger
-  logger.addHandler(ch)
-  logger.addHandler(fh)
-  
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.DEBUG)
+    rootLogger.addFilter(NonRootFilter())
+
+    # create file handler which logs error messages
+    fh = logging.FileHandler(errorfile, mode="w")
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - '
+                                  '%(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    # create console handler
+    ch = logging.StreamHandler()
+    # add the handlers to logger
+    rootLogger.addHandler(ch)
+    rootLogger.addHandler(fh)
+
 
 def parseCmdline(petabricks_path):
   parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
-  parser.add_option("--heuristics", 
-                type="string", 
-                help="name of the file containing the set of heuristics to use", 
+  parser.add_option("--heuristics",
+                type="string",
+                help="name of the file containing the set of heuristics to use",
                 default=None)
-  parser.add_option("--trainingset",    
-          type="string", 
-          help="name of the file containing the list of programs to learn from", 
+  parser.add_option("--trainingset",
+          type="string",
+          help="name of the file containing the list of programs to learn from",
           default=os.path.join(petabricks_path, "scripts/trainingset.txt"))
   parser.add_option("--maxtestsize",
                     type="int",
@@ -74,26 +85,28 @@ def parseCmdline(petabricks_path):
 		type="int",
 		help="maximum time (in seconds) to be spent tuning a candidate",
 		default=None)
-		    
+
   return parser.parse_args()
 
 
 
-def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT, staticInputName=None, generateStaticInput=False):
+def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT, 
+                 staticInputName=None, generateStaticInput=False):
   """Tests the effects of learning, by compiling the benchmark with the current
 best heuristics, then executing it and fetching the average timing result
 
-If staticInputName is specified, such input is used. If generateStaticInput is True, than it is also generated"""
+If staticInputName is specified, such input is used. If generateStaticInput is 
+True, than it is also generated"""
   compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
-  
+
   candidates=[]
   sgatuner.autotune_withparams(testBinary, candidates, n, maxtime)
-  
+
   if generateStaticInput:
     if not staticInputName:
       raise IOError
     cmd=[testBinary, "--n=%s"%n, "--iogen-create=%s"%staticInputName]
-    
+
     print "Generating input files for the test program"
     NULL=open("/dev/null","w")
     p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
@@ -106,74 +119,77 @@ If staticInputName is specified, such input is used. If generateStaticInput is T
   else:
     iogen_run=None
     size=n
-    
-  res=pbutil.executeTimingRun(testBinary, n=size, trials=None, iogen_run=iogen_run)
+
+  res=pbutil.executeTimingRun(testBinary, n=size, trials=None, 
+                              iogen_run=iogen_run)
   avgExecutionTime=res["average"]
-  
+
   return avgExecutionTime
-  
+
 
 class HeuristicsGraphDataGenerator(object):
   def __init__(self, heuristicKinds):
     self._db = heuristicdb.HeuristicDB()
     self._heuristicKinds = heuristicKinds
-    
+
     #Output files (one for each heuristic kind)
     self._out = {}
-    
+
     #Graph generation scripts (one for each heuristic kind)
     self._script = {}
-    
+
     #Ordered lists of heuristics (one for each kind)
     self._heurList = {}
-    
+
     for kind in self._heuristicKinds:
       self._heurList[kind] = []
       datafile = self._dataFileName(kind)
       self._out[kind] = open(datafile, "w")
-      self._script[kind] = self._initScript(kind)
-  
+      self._initScript(kind)
+
   def _dataFileName(self, heuristicKind):
     return heuristicKind + ".dat"
-  
+
   def _initScript(self, heuristicKind):
     script = open(heuristicKind+".gnuplot", "w")
-    
+
     script.write("set xtics rotate by -90\n")
     script.write("set key outside\n")
     script.write("""set xtics out font "Arial,8"\n""")
 
     #Plot something random to force gnuplot to use the new settings
     #It will be overwritten by the real plot
-    script.write("plot x\n") 
+    script.write("plot x\n")
 
-    return script
-    
-    
+    self._script[heuristicKind] = script
+
+
   def _finalizeScript(self, heuristicKind):
     script = self._script[heuristicKind]
-    
+
     script.write("\n")
     script.close()
-    
-    
+
+
   def _plotFirstDataColumn(self, kind, heuristic):
     datafile = self._dataFileName(kind)
     title = heuristic
-    initialplotcmd="""plot "%s" using 2:xticlabels(1) with lines notitle, \\\n""" \
-                   """     "%s" using 2:xticlabels(1) title "%s" """ % (datafile, datafile, title)
+    initialplotcmd= """plot "%s" using 2:xticlabels(1) """ \
+                    "with lines notitle, \\\n" \
+                    """     "%s" using 2:xticlabels(1) title "%s" """ 
+    initialplotcmd = initialplotcmd % (datafile, datafile, title)
     self._script[kind].write(initialplotcmd)
-    
-    
+
+
   def _updateScript(self, heuristicKind, newHeurList):
-    """Update the generation script with the lines needed to plot 
+    """Update the generation script with the lines needed to plot
     the new heuristics"""
     if len(newHeurList)==0:
       #Nothing to be done
       return
-    
+
     lastPlottedColumn = len(self._heurList[heuristicKind])+1
-    
+
     if lastPlottedColumn==1:
       self._plotFirstDataColumn(heuristicKind, newHeurList[0])
       column = 2
@@ -181,7 +197,7 @@ class HeuristicsGraphDataGenerator(object):
     else:
       column = lastPlottedColumn
       toBePlotted = newHeurList
-    
+
     #Plot every other column
     datafile = self._dataFileName(heuristicKind)
     script = self._script[heuristicKind]
@@ -192,26 +208,27 @@ class HeuristicsGraphDataGenerator(object):
               """, \\\n     "%s" using %d:xticlabels(1) title "%s" """
       plotcmd = plotcmd % (datafile, column, datafile, column, title)
       script.write(plotcmd)
-      
+
     script.flush()
 
-    
-    
+
+
   def outputLineByKind(self, programName, heuristicKind):
     outFile = self._out[heuristicKind]
     heurList = self._heurList[heuristicKind]
-    
+
     outFile.write(programName)
-    
-    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind, MAX_PRINTED_HEURISTICS)
-    
+
+    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind, 
+                                                    MAX_PRINTED_HEURISTICS)
+
     #Add new heuristics to the list keeping the order of the previous ones
     keys = scores.keys()
     newHeurList = filter(lambda x: x not in heurList, keys)
-    
+
     self._updateScript(heuristicKind, newHeurList)
     heurList.extend(newHeurList)
-    
+
     #Output the line
     for heuristic in heurList:
       outFile.write("\t")
@@ -220,101 +237,101 @@ class HeuristicsGraphDataGenerator(object):
       except KeyError:
 	#No score available for the current heuristic at this time
 	outFile.write("-")
-    
+
     outFile.write("\n")
     outFile.flush()
-    
-  
+
+
   def outputLine(self, programName):
     """Outputs one line for each heuristic kind file"""
     for kind in self._heuristicKinds:
       self.outputLineByKind(programName, kind)
-      
-    
+
+
   def close(self):
     self._db.close()
     for kind in self._heuristicKinds:
       self._out[kind].close()
       self._finalizeScript(kind)
-      
-    
-    
-  
-  
-  
-  
+
+
+
+
+
+
+
 def main():
   """The body of the program"""
-  
+
   script_path = sys.path[0]
   petabricks_path = os.path.join(script_path, "../")
   petabricks_path = os.path.normpath(petabricks_path)
 
   pbc = os.path.join(petabricks_path,"src/pbc")
-  
+
   (options, args) = parseCmdline(petabricks_path)
-  
+
   if len(args)==0:
     print "No test program specified"
     exit(-1)
-  
+
   configureLogging(options.errorfile)
-  
+
   testProgram=os.path.abspath(args[0])
   testBinary = os.path.splitext(testProgram)[0]
-  
+
   #Create objects
-  compiler = learningcompiler.LearningCompiler(pbc, 
+  compiler = learningcompiler.LearningCompiler(pbc,
                                       heuristicSetFileName = options.heuristics,
-                                      n=options.maxtuningsize, 
+                                      n=options.maxtuningsize,
                                       maxTuningTime=options.maxtuningtime)
-  
+
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
-  
+
   logging.basicConfig(filename=options.errorfile, filemode='w')
-  
+
   examples_path= os.path.join(petabricks_path, "examples")
-  
+
   trainingset = open(options.trainingset, "r")
   resultfile = open(options.resultfile, "w")
-  
-  
+
+
   print "Compiling and testing the initial version of the test program"
   try:
-    res = testLearning(pbc, 
-		       testProgram, 
-		       testBinary, 
-		       options.maxtestsize, 
+    res = testLearning(pbc,
+		       testProgram,
+		       testBinary,
+		       options.maxtestsize,
 		       options.maxtesttime,
 		       STATIC_INPUT_PREFIX,
 		       generateStaticInput=True)
   except:
     logger.exception("ERROR compiling and testing the test program:\n")
     sys.exit(-1)
-  
+
   resultfile.write(""""INITIAL" %s\n""" % res)
-  
+
   hgdatagen.outputLine("INITIAL")
-  
+
   for line in trainingset:
     trainingprogram=line.strip(" \n\t")
     if len(trainingprogram)==0 or trainingprogram[0]=="#":
       #Comment or empty line
       continue
-    
+
     program=os.path.join(examples_path, trainingprogram)
     src=program+".pbcc"
     binary=program
-    
+
     print "Learning from "+trainingprogram
-    
+
     try:
       compiler.compileLearningHeuristics(src, binary)
       print "Compiling and testing the test program"
-      res=testLearning(pbc, 
-		       testProgram, 
-		       testBinary, 
-		       options.maxtestsize, 
+      res=testLearning(pbc,
+		       testProgram,
+		       testBinary,
+		       options.maxtestsize,
 		       options.maxtesttime,
 		       STATIC_INPUT_PREFIX)
     except pbutil.TimingRunTimeout:
@@ -330,12 +347,12 @@ def main():
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
     resultfile.flush()
-    
+
     hgdatagen.outputLine(trainingprogram)
 
   print "Results written to " + options.resultfile
-  
+
   hgdatagen.close()
-  
+
 if __name__ == "__main__":
   main()
