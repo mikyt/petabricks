@@ -82,10 +82,10 @@ class Heuristic(object):
     name=self._name
     formula=escape(self._formula)
     return """<heuristic name="%s" formula="%s" %s%s%s/>""" % (name,
-							       formula,
-							       usesPart,
-							       tooLowPart,
-							       tooHighPart)
+                                                               formula,
+                                                               usesPart,
+                                                               tooLowPart,
+                                                               tooHighPart)
 
   def _buildStringPart(self, varName, variable):
     if variable is not None:
@@ -345,7 +345,6 @@ with the originalIndex field added"""
       points = (numCandidates - count) / float(numCandidates)
 
       if candidate.assignScores:
-	assert not candidate.failed
 	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
       else:
 	assert candidate.failed
