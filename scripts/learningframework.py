@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 #---------------- Config ------------------
 CONF_MIN_TRIAL_NUMBER = 6
-CONF_EXPLORATION_PROBABILITY = 0.3
+CONF_EXPLORATION_PROBABILITY = 0.7
 CONF_PICK_BEST_N = 5
 #------------------------------------------
 
@@ -420,8 +420,8 @@ getting the current best heuristics, without modifying them"""
 
 
 
-  def learnHeuristics(self, benchmark):
-    logger.info("Learning: %s", benchmark)
+  def useBestHeuristics(self, benchmark, learn=True):
+    logger.info("Using best heuristics on: %s", benchmark)
 
     #Init variables
     candidates = CandidateList(self._candidateSortingKey)
@@ -445,8 +445,9 @@ getting the current best heuristics, without modifying them"""
     candidates.addOriginalIndex()
     candidates.sort()
 
-    if canLearn:
-      self.storeCandidatesDataInDB(candidates)
+    if canLearn and learn:
+        logger.info("Storing learning results in the DB")
+        self.storeCandidatesDataInDB(candidates)
 
 
     if self._tearDown is not None:

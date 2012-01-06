@@ -9,11 +9,9 @@ import learningframework
 import os
 import sys
 import pbutil
-import sgatuner
 import subprocess
 import heuristicdb
 import logging
-from pbutil_support import compileBenchmark
 from optparse import OptionParser
 
 CONF_TIMEOUT = 5 * 60
@@ -89,42 +87,58 @@ def parseCmdline(petabricks_path):
   return parser.parse_args()
 
 
-
-def testLearning(pbc, testProgram, testBinary, n, maxtime=CONF_TIMEOUT, 
-                 staticInputName=None, generateStaticInput=False):
-  """Tests the effects of learning, by compiling the benchmark with the current
-best heuristics, then executing it and fetching the average timing result
-
+class TestRunner(object):
+    """Tests the effects of learning, by compiling benchmarks using the given
+learningcompiler with learning disabled, then executing them and fetching 
+the average timing result."""
+    def __init__(self, learningcompiler, maxtestsize, maxtesttime):
+        self._compiler = learningcompiler
+        self._maxtestsize = maxtestsize
+        self._maxtesttime = maxtesttime
+        
+    def test(self, src, outputbinary, staticInputName = None, 
+             generateStaticInput = False):
+        """Perform the test on the src program, generating the outputbinary.
 If staticInputName is specified, such input is used. If generateStaticInput is 
 True, than it is also generated"""
-  compileBenchmark(pbc, testProgram, testBinary, timeout=CONF_TIMEOUT)
+        timingruns = 5
+        
+        oldtuningsize = self._compiler.maxtuningsize
+        oldtuningtime = self._compiler.maxtuningtime
+        self._compiler.maxtuningsize = self._maxtestsize
+        self._compiler.maxtuningtime = self._maxtesttime
+        
+        self._compiler.compileProgram(src, outputbinary, learn = False)
+        
+        self._compiler.maxtuningsize = oldtuningsize
+        self._compiler.maxtuningtime = oldtuningtime
 
-  candidates=[]
-  sgatuner.autotune_withparams(testBinary, candidates, n, maxtime)
-
-  if generateStaticInput:
-    if not staticInputName:
-      raise IOError
-    cmd=[testBinary, "--n=%s"%n, "--iogen-create=%s"%staticInputName]
-
-    print "Generating input files for the test program"
-    NULL=open("/dev/null","w")
-    p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
-    p.wait()
-    NULL.close()
-
-  if staticInputName:
-    iogen_run=staticInputName
-    size=None
-  else:
-    iogen_run=None
-    size=n
-
-  res=pbutil.executeTimingRun(testBinary, n=size, trials=None, 
-                              iogen_run=iogen_run)
-  avgExecutionTime=res["average"]
-
-  return avgExecutionTime
+        if generateStaticInput:
+            if not staticInputName:
+                raise IOError
+            cmd=[outputbinary, 
+                 "--n=%s" % self._maxtestsize, 
+                 "--iogen-create=%s" % staticInputName]
+        
+            print "Generating input files for the test program"
+            NULL=open("/dev/null","w")
+            logger.debug("Executing: %s" % cmd)
+            p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
+            p.wait()
+            NULL.close()
+        
+        if staticInputName:
+            iogen_run = staticInputName
+            size = None
+        else:
+            iogen_run = None
+            size = self._maxtestsize
+        
+        res=pbutil.executeTimingRun(outputbinary, n=size, trials=timingruns, 
+                                    iogen_run=iogen_run)
+        avgExecutionTime=res["average"]
+        
+        return avgExecutionTime
 
 
 class HeuristicsGraphDataGenerator(object):
@@ -266,7 +280,7 @@ def main():
   script_path = sys.path[0]
   petabricks_path = os.path.join(script_path, "../")
   petabricks_path = os.path.normpath(petabricks_path)
-
+  examples_path= os.path.join(petabricks_path, "examples")  
   pbc = os.path.join(petabricks_path,"src/pbc")
 
   (options, args) = parseCmdline(petabricks_path)
@@ -285,29 +299,21 @@ def main():
                                       heuristicSetFileName = options.heuristics,
                                       n=options.maxtuningsize,
                                       maxTuningTime=options.maxtuningtime)
-
+  tester = TestRunner(compiler, options.maxtestsize, options.maxtesttime)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
 
-  logging.basicConfig(filename=options.errorfile, filemode='w')
-
-  examples_path= os.path.join(petabricks_path, "examples")
-
+  #Open files
   trainingset = open(options.trainingset, "r")
   resultfile = open(options.resultfile, "w")
 
 
   print "Compiling and testing the initial version of the test program"
   try:
-    res = testLearning(pbc,
-		       testProgram,
-		       testBinary,
-		       options.maxtestsize,
-		       options.maxtesttime,
-		       STATIC_INPUT_PREFIX,
-		       generateStaticInput=True)
+      res = tester.test(testProgram, testBinary, 
+                  STATIC_INPUT_PREFIX, generateStaticInput=True)
   except:
-    logger.exception("ERROR compiling and testing the test program:\n")
-    sys.exit(-1)
+      logger.exception("ERROR compiling and testing the test program:\n")
+      sys.exit(-1)
 
   resultfile.write(""""INITIAL" %s\n""" % res)
 
@@ -326,24 +332,21 @@ def main():
     print "Learning from "+trainingprogram
 
     try:
-      compiler.compileLearningHeuristics(src, binary)
-      print "Compiling and testing the test program"
-      res=testLearning(pbc,
-		       testProgram,
-		       testBinary,
-		       options.maxtestsize,
-		       options.maxtesttime,
-		       STATIC_INPUT_PREFIX)
+        compiler.compileProgram(src, binary)
+        
+        print "Compiling and testing the test program"
+        res = tester.test(testProgram, testBinary, 
+                          STATIC_INPUT_PREFIX)
     except pbutil.TimingRunTimeout:
-      logger.exception("Timeout!")
-      res = CONF_TIMEOUT
+        logger.exception("Timeout!")
+        res = options.maxtesttime
     except learningframework.AllCandidatesCrashError:
-      logger.error("All candidates crash while compiling: %s", trainingprogram)
-      res=-1
+        logger.error("All candidates crash while compiling: %s", trainingprogram)
+        res=-1
     except:
-      logger.exception("Irrecoverable error while learning:\n")
-      res=-1
-      sys.exit(-2)
+        logger.exception("Irrecoverable error while learning:\n")
+        res=-1
+        sys.exit(-2)
 
     resultfile.write(""""%s" %f\n""" % (trainingprogram, res))
     resultfile.flush()
@@ -355,4 +358,4 @@ def main():
   hgdatagen.close()
 
 if __name__ == "__main__":
-  main()
+    main()

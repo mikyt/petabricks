@@ -35,7 +35,8 @@ then by average execution time of the biggest dimension (the lower the better)""
 
 
 class LearningCompiler:
-  def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, maxTuningTime=CONF_MAX_TIME):
+  def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
+               maxTuningTime=CONF_MAX_TIME):
     self._learner = learningframework.Learner(self.testHSet,
                                               candidateKey,
                                               heuristicSetFileName,
@@ -47,12 +48,26 @@ class LearningCompiler:
     self._n = n
     self._maxTuningTime = maxTuningTime
 
+  def _getMaxTuningSize(self):
+      return self._n
 
-  def compileLearningHeuristics(self, benchmark, finalBinary = None):
+  def _setMaxTuningSize(self, maxTuningSize):
+      self._n = maxTuningSize
+  
+  def _getMaxTuningTime(self):
+      return self._maxTuningTime
+      
+  def _setMaxTuningTime(self, maxTuningTime):
+      self._maxTuningTime = maxTuningTime
+  
+  maxtuningsize = property(_getMaxTuningSize, _setMaxTuningSize)
+  maxtuningtime = property(_getMaxTuningTime, _setMaxTuningTime)
+  
+  def compileProgram(self, benchmark, finalBinary = None, learn=True):
     self._finalBinary = finalBinary
     self._neededHeuristics={}
 
-    return self._learner.learnHeuristics(benchmark)
+    return self._learner.useBestHeuristics(benchmark, learn)
 
 
   def testHSet(self, benchmark, count, hSet, additionalParameters):
