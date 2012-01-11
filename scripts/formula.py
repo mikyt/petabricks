@@ -1,13 +1,57 @@
+import logging
 import random
+import sys
+
+logger = logging.getLogger(__name__)
 
 _mutateMIN = -100
 _mutateMAX = 100
 _mutationProbability = 0.3
 
+class Error(Exception):
+    """Base class for all the exceptions of this module"""
+    pass
+
+
+class NoElementException(Error):
+    pass    
+
+
+def selectDifferentElement(element, theList):
+  """Select an element from the list, different from the given one"""
+  if len(theList) == 1 and element==theList[0]:
+    raise NoElementException()
+  
+  newElement = random.choice(theList)
+  while newElement == element:
+    newElement = random.choice(theList)
+    
+  return newElement
+
+
 def isImmediateNumber(formula):
   return isinstance(formula, FormulaInteger) or \
          isinstance(formula, FormulaFloat)
 
+def outside_limits(value, min_val, max_val):
+    if value < min_val or value > max_val:
+        return True
+    return False
+    
+def evolution_coefficient(value, min_val, max_val):
+    """Determine the evolution coefficient.
+    
+It's a number comprised between -1 and 1.
+If the current value is already equal to min (respectively max)
+the coefficient will be strictly positive (respectively negative)"""
+    if value == min_val:
+        return random.uniform(0, 1)
+        
+    if value == max_val:
+        return random.uniform(-1, 0)
+        
+    return random.uniform(-1, 1)
+    
 
 class FormulaVariable:
   def __init__(self, ident):
@@ -16,7 +60,7 @@ class FormulaVariable:
   def __repr__(self):
     return self.ident
     
-  def evolve(self):
+  def evolve(self, _=None, __=None):
     #No values to mutate in a variable
     return False
   
@@ -28,13 +72,16 @@ class FormulaInteger:
   def __repr__(self):
     return str(self.value)
     
-  def evolve(self):
+  def evolve(self, min_val=float("-inf"), max_val=float("inf")):
     if random.random() < _mutationProbability:
-      self.mutateValue()
-      return True
+        return self.mutateValue(min_val, max_val)
+    
     #Evolve (=increment/decrement of at most 100% of the original value)
     oldValue = self.value 
-    self.value = int(self.value + (self.value * random.uniform(-1, 1)))
+    self.value = int(self.value + (self.value * 
+                                   evolution_coefficient(self.value,
+                                                         min_val,
+                                                         max_val)))
     if oldValue == self.value:
       #The value did not change. It was too small to be modified that way
       #Force a change
@@ -42,13 +89,27 @@ class FormulaInteger:
         self.value = self.value - 1
       else:
         self.value = self.value + 1
+        
+    if outside_limits(self.value, min_val, max_val):
+        #Looks like the limits are really tight
+        #Pick a random value in between
+        return self.mutateValue(min_val, max_val)
+        
     return True
 
-  def mutateValue(self):
+  def mutateValue(self, min_val, max_val):
     """Get a completely random new value"""
+    if min_val==max_val:
+        self.value = min_val
+        return False
+        
     oldValue = self.value 
-    while oldValue==self.value:
-      self.value = random.randint(_mutateMIN, _mutateMAX)
+    if min_val == float("-inf"):
+        min_val = -sys.maxint
+    if max_val == float("inf"):
+        max_val = sys.maxint
+    while oldValue == self.value:
+        self.value = random.randint(min_val, max_val)
     return True
 
 
@@ -62,7 +123,7 @@ class FormulaBool:
     else:
       return "false"
       
-  def evolve(self):
+  def evolve(self, unused_min_val=None, unused_max_val=None):
     if random.random() < 0.5:
       self.value = False
     else:
@@ -77,13 +138,15 @@ class FormulaFloat:
   def __repr__(self):
     return str(self.value)
     
-  def evolve(self):
+  def evolve(self, min_val=float("-inf"), max_val=float("inf")):
     if random.random() < _mutationProbability:
-      self.mutateValue()
-      return True
+      return self.mutateValue(min_val, max_val)
+      
     #Evolve (=increment/decrement of at most 100% of the original value)
     oldValue = self.value 
-    self.value = self.value + (self.value * random.uniform(-1, 1))
+    self.value = self.value + (self.value * evolution_coefficient(self.value,
+                                                                  min_val,
+                                                                  max_val))
     if oldValue == self.value:
       #The value did not change. It was too small to be modified that way
       #Force a change
@@ -91,28 +154,27 @@ class FormulaFloat:
         self.value = self.value - 1
       else:
         self.value = self.value + 1
+        
+    if outside_limits(self.value, min_val, max_val):
+        #Looks like the limits are really tight
+        #Pick a random value in between
+        return self.mutateValue(min_val, max_val)
+    
     return True
     
-  def mutateValue(self):
-    oldValue = self.value
-    while(oldValue==self.value):
-      self.value = random.uniform(_mutateMIN, _mutateMAX)
-    return True
     
-    
-class NoElementException(Exception):
-  pass
+  def mutateValue(self, min_val, max_val):
+      """Get a completely random new value"""
+      if min_val==max_val:
+          self.value = min_val
+          return False
+        
+      oldValue = self.value
+      while(oldValue==self.value):
+        self.value = random.uniform(min_val, max_val)
+      return True
 
-def selectDifferentElement(element, theList):
-  """Select an element from the list, different from the given one"""
-  if len(theList) == 1 and element==theList[0]:
-    raise NoElementException()
-  
-  newElement = random.choice(theList)
-  while newElement == element:
-    newElement = random.choice(theList)
-    
-  return newElement
+
   
   
   
@@ -185,13 +247,15 @@ Returns true if the formula was actually mutated, false otherwise"""
        
     return True
         
-  def evolve(self):
+  def evolve(self, unused_min_val=float("-inf"), unused_max_val=float("inf")):
     """Randomly mutate one of the values or the binary operation, or the 
 operator"""
     choices=range(2)
     random.shuffle(choices)
     for choice in choices:
       mutated=False
+      #TODO: change evolution algorithm (using a simbolic framework like sympy?) 
+      #to actually acknowledge min_val and max_val
       if choice==0:
         mutated=self.evolveValue()
       elif choice==1:
@@ -217,7 +281,8 @@ class FormulaIf:
       
     return "if " + str(self.cond) + " then " + str(self.thenClause) + elsePart
     
-  def evolve(self):
+  def evolve(self, min_val=float("-inf"), max_val=float("inf")):
+    print "START"
     choices = range(3)
     random.shuffle(choices)
     for choice in choices:
@@ -225,9 +290,9 @@ class FormulaIf:
       if choice==0:
         mutated = self.cond.evolve()
       elif choice==1:
-        mutated = self.thenClause.evolve()
+        mutated = self.thenClause.evolve(min_val, max_val)
       elif choice==2 and self.elseClause is not None:
-        mutated = self.elseClause.evolve()
+        mutated = self.elseClause.evolve(min_val, max_val)
       
       if mutated:
         return True

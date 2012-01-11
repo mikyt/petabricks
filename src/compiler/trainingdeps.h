@@ -127,13 +127,17 @@ public:
     unsigned int uses = heuristic->uses();
     unsigned int tooLow = heuristic->tooLow();
     unsigned int tooHigh = heuristic->tooHigh();
+    double max = heuristic->getMax();
+    double min = heuristic->getMin();
     
     _os << "  <heuristic";
     _os << " name=\"" << name << "\"";
     _os << " formula=\"" << jalib::escapeXML(formula) << "\"";
-    _os << " uses=\"" << jalib::escapeXML(jalib::XToString(uses)) << "\"";
-    _os << " tooHigh=\"" << jalib::escapeXML(jalib::XToString(tooHigh)) << "\"";
-    _os << " tooLow=\"" << jalib::escapeXML(jalib::XToString(tooLow)) << "\"";
+    _os << " uses=\"" << jalib::XToString(uses) << "\"";
+    _os << " tooHigh=\"" << jalib::XToString(tooHigh) << "\"";
+    _os << " tooLow=\"" << jalib::XToString(tooLow) << "\"";
+    _os << " max=\"" << jalib::XToString(max) << "\"";
+    _os << " min=\"" << jalib::XToString(min) << "\"";
     _os << " />\n";
   }
   

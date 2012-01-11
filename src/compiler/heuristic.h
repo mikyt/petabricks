@@ -39,6 +39,8 @@ namespace petabricks {
 typedef std::map<std::string, double> ValueMap;
 
 class Heuristic : public jalib::JRefCounted {
+  friend class HeuristicManager;
+  
 public:
   Heuristic(const std::string formula) :
         _formula(MaximaWrapper::instance().runCommandSingleOutput(formula)),
@@ -63,13 +65,15 @@ public:
   unsigned int tooLow() const { return _tooLow; }
   unsigned int tooHigh() const { return _tooHigh; }
   
-  void setMin(const double min) { _min = min; }
-  void setMax(const double max) { _max = max; }
-  
+  double getMin() { return _min; }
+  double getMax() { return _max; }
 private:
   /** Eval the heuristic using the given features. Return the exact result,
    * not limited by _max and _min */
   double evalWithoutLimits(const ValueMap featureValues) const;
+  
+  void setMin(const double min) { _min = min; }
+  void setMax(const double max) { _max = max; }
   
 private:
   FormulaPtr _formula;

@@ -8,7 +8,9 @@ import pprint
 import logging
 from xml.sax.saxutils import escape
 
+
 logger = logging.getLogger(__name__)
+
 
 #---------------- Config ------------------
 CONF_MIN_TRIAL_NUMBER = 6
@@ -16,8 +18,12 @@ CONF_EXPLORATION_PROBABILITY = 0.7
 CONF_PICK_BEST_N = 5
 #------------------------------------------
 
+class Error(Exception):
+    """Base class for all the exceptions thrown by the learning framework"""
+    pass
 
-class AllCandidatesCrashError(Exception):
+
+class AllCandidatesCrashError(Error):
     pass
 
 
@@ -53,8 +59,40 @@ class SuccessfulCandidate(Candidate):
     Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, originalIndex=None)
 
 
+class NeededHeuristic(object):
+    def __init__(self, name, min_val=None, max_val=None):
+        self.name = name
+        
+        if min_val is None:
+            self._min_val = float("-inf")
+        else:
+            self._min_val = min_val
+        
+        if max_val is None:
+            self._max_val = float("inf")
+        else:
+            self._max_val = max_val
+    
+    def __repr__(self):
+        return "%s (min=%s, max=%s)" % (self.name, self.min_val, self.max_val)
+        
+        
+    @property
+    def min_val(self):
+        return self._min_val
+    
+    @property
+    def max_val(self):
+        return self._max_val
+     
+    def derive_heuristic(self, formula):
+        return Heuristic(self.name, formula, min_val=self.min_val, 
+                         max_val=self.max_val)
+        
+        
 class Heuristic(object):
-  def __init__(self, name, formula, uses=None, tooLow=None, tooHigh=None):
+  def __init__(self, name, formula, uses=None, tooLow=None, tooHigh=None, 
+               min_val=None, max_val=None):
     self._name = name
     self._formula = formula
 
@@ -72,24 +110,47 @@ class Heuristic(object):
       self._tooHigh = None
     else:
       self._tooHigh = int(tooHigh)
+      
+    if (min_val is None) or min_val == "":
+        self._min = float("-inf")
+    else:
+        self._min = float(min_val)
+        
+    if (max_val is None) or max_val == "":
+        self._max = float("inf")
+    else:
+        self._max = float(max_val)
 
-
+    
   def __repr__(self):
+    formula = escape(self._formula)
     usesPart = self._buildStringPart("uses", self._uses)
     tooLowPart = self._buildStringPart("tooLow", self._tooLow)
     tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
-
+    
+    if self._min == float("-inf"):
+        min_part = ""
+    else:
+        min_part = " min=%s" % self._min
+        
+    if self._max == float("inf"):
+        max_part = ""
+    else:
+        max_part = " max=%s" % self._max
+    
     name=self._name
-    formula=escape(self._formula)
-    return """<heuristic name="%s" formula="%s" %s%s%s/>""" % (name,
-                                                               formula,
-                                                               usesPart,
-                                                               tooLowPart,
-                                                               tooHighPart)
+    
+    return """<heuristic name="%s" formula="%s"%s%s%s%s%s />""" % (name,
+                                                                   formula,
+                                                                   usesPart,
+                                                                   tooLowPart,
+                                                                   tooHighPart,
+                                                                   min_part,
+                                                                   max_part)
 
   def _buildStringPart(self, varName, variable):
     if variable is not None:
-      return " %s=%d" % (varName, variable)
+      return ' %s="%s"' % (varName, variable)
     else:
       return ""
 
@@ -99,8 +160,8 @@ class Heuristic(object):
 
   @property
   def formula(self):
-    return self._formula
-
+      return self._formula
+  
   @property
   def uses(self):
     return self._uses
@@ -112,13 +173,28 @@ class Heuristic(object):
   @property
   def tooHigh(self):
     return self._tooHigh
+    
+  @property
+  def min_val(self):
+      return self._min
+      
 
-  def forceEvolution(self):
-    formulaObj = maximaparser.parse(self.formula)
-    formulaObj.evolve()
-    self.formula=str(formulaObj)
+  @property
+  def max_val(self):
+      return self._max
 
+  def evolve(self):
+    formulaObj = maximaparser.parse(self._formula)
+    formulaObj.evolve(self._min, self._max)
+    self._formula=str(formulaObj)
 
+  def derive_needed_heuristic(self):
+      """Return a NeededHeuristic object corresponding to the current heuristic.
+
+The returned object will have the name, min and max fields set to the same 
+values as the heuristic object it is invoked upon.
+Everything else will be None"""
+      return NeededHeuristic(self._name, min_val=self._min, max_val=self._max)
 
 
 class HeuristicSet(dict):
@@ -154,32 +230,29 @@ class HeuristicSet(dict):
       uses = heuristicXML.getAttribute("uses")
       tooLow = heuristicXML.getAttribute("tooLow")
       tooHigh = heuristicXML.getAttribute("tooHigh")
+      minVal = heuristicXML.getAttribute("min")
+      maxVal = heuristicXML.getAttribute("max")
 
       #Use the parser to validate (and to constant fold) the formula
       formula = str(maximaparser.parse(formula))
-      self[name] = Heuristic(name, formula, uses, tooLow, tooHigh)
+      self[name] = Heuristic(name, formula, uses, tooLow, tooHigh, minVal, 
+                             maxVal)
 
-  def complete(self, heuristicNames, db, N):
+  def complete(self, neededHeuristics, db, N):
     """Complete the sets using the given db, so that it contains all the
 heuristics specified in the heuristicNames list.
 
 Every missing heuristic is completed with one randomly taken from the best N
 heuristics in the database  """
     #Find the missing heuristics
-    missingHeuristics = list(heuristicNames)
-    for name in self:
-      try:
-        missingHeuristics.remove(name)
-      except ValueError:
-        #A heuristic could be in the input file, but useless, therefore not in
-        #the missingHeuristic list
-        pass
+    missingHeuristics = [heur for heur in neededHeuristics 
+                         if heur.name not in self]
 
     #Complete the set
-    for heuristic in missingHeuristics:
+    for missing_heur in missingHeuristics:
       logger.debug("----------------------")
-      logger.debug("Heuristic %s is missing", heuristic)
-      bestN = db.getBestNHeuristics(heuristic, N)
+      logger.debug("Heuristic %s is missing", missing_heur)
+      bestN = db.getBestNHeuristics(missing_heur.name, N)
       if len(bestN) == 0:
         #No such heuristic in the DB. Do not complete the set
         #This is not a problem. It's probably a new heuristic:
@@ -189,24 +262,21 @@ heuristics in the database  """
         logger.debug("----------------------")
         continue
       formula = random.choice(bestN)
-
+      heur = missing_heur.derive_heuristic(formula)
+      
       if random.random() < CONF_EXPLORATION_PROBABILITY:
-        #Generate a new formula by modifying the existing one
-        formulaObj = maximaparser.parse(formula)
-        formulaObj.evolve()
-
-        logger.debug("EVOLUTION!\nFrom: %s\nTo: %s", formula, formulaObj)
-        formula = str(formulaObj)
+        #Generate a new formula by modifying the existing one        
+        heur.evolve()
+        logger.debug("EVOLUTION!\nFrom: %s\nTo: %s", formula, heur.formula)
       else:
-        logger.debug("No mutation for: %s", formula)
+        logger.debug("No evolution for: %s", formula)
       logger.debug("----------------------")
-      self[heuristic] = Heuristic(heuristic, formula)
-
-    return False
+      self[heur.name] = heur
+      
 
   def forceEvolution(self):
     (name, heuristic) = random.choice(self.items())
-    heuristic.forceEvolution()
+    heuristic.evolve()
 
 
   def ensureUnique(self, hSetCollection):
@@ -344,10 +414,9 @@ with the originalIndex field added"""
                   pp.pformat(candidate.heuristicSet))
       points = (numCandidates - count) / float(numCandidates)
 
-      if candidate.assignScores:
+      if candidate.assignScores and not candidate.failed:
 	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
       else:
-	assert candidate.failed
 	self._db.markAsUsed(candidate.heuristicSet, uses=1)
 
 
@@ -360,16 +429,20 @@ getting the current best heuristics, without modifying them"""
     #Get the best N heuristics of each kind
     #TODO: use information about the best heuristic sets!!!
     heuristicLists = {}
-    for kind in neededHeuristics:
-      heuristicLists[kind] = [Heuristic(kind, formula) for formula in self._db.getBestNHeuristics(kind, eliteSize)]
+    for heur in neededHeuristics:
+        kind = heur.name
+        heuristicLists[kind] = [heur.derive_heuristic(formula)
+                                for formula 
+                                in self._db.getBestNHeuristics(kind, eliteSize)]
 
     #Build the sets
     try:
       for i in range(eliteSize):
 	newSet = HeuristicSet()
 
-	for kind in neededHeuristics:
-	  newSet[kind] = heuristicLists[kind][i]
+	for heur in neededHeuristics:
+              kind=heur.name
+              newSet[kind] = heuristicLists[kind][i]
 
 	allHSets.append(newSet)
 	logger.debug("ELITE: %s", newSet)
@@ -394,7 +467,7 @@ getting the current best heuristics, without modifying them"""
 
     #Generate the ramaining needed (empty) heuristicSets
     numNeeded = self._minTrialNumber - numGenerated
-    for i in range(numNeeded):
+    for _ in range(numNeeded):
       allHSets.append(HeuristicSet())
 
     #Complete heuristic sets
