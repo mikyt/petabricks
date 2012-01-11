@@ -1060,7 +1060,6 @@ void petabricks::UserRule::generateTrampCode(Transform& trans, CodeGenerator& o,
     if(isSingleElement()){
       trans.markSplitSizeUse(o);
       HeuristicPtr blockNumberHeur = HeuristicManager::instance().getHeuristic("UserRule_blockNumber");
-      blockNumberHeur->setMin(2);
       ValueMap features;
       features["ruleOpsNumber"] = _bodyir[flavor]->opsNumber();
       features["functionCallNumber"] = _bodyir[flavor]->subnodeCount(RIRNode::EXPR_CALL);

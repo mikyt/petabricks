@@ -31,10 +31,10 @@ then by average execution time of the biggest dimension (the lower the better)""
     return (float('inf'), float('inf'))
   numDimensions = len(candidate.metrics[0])
   executionTime = candidate.metrics[0][2**(numDimensions-1)].mean()
-  return (1 / numDimensions, executionTime)
+  return (1.0 / numDimensions, executionTime)
 
 
-class LearningCompiler:
+class LearningCompiler(object):
   def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
                maxTuningTime=CONF_MAX_TIME):
     self._learner = learningframework.Learner(self.testHSet,
@@ -192,7 +192,9 @@ following attributes:
     currentCandidate.heuristicSet = currentDefaultHSet
 
     #Store the list of needed heuristics for the current benchmark
-    self._neededHeuristics[benchmark] = currentDefaultHSet.keys()
+    self._neededHeuristics[benchmark] = [heur.derive_needed_heuristic()
+                                         for _, heur 
+                                         in currentDefaultHSet.iteritems()]
 
     return 0
 
@@ -201,7 +203,7 @@ following attributes:
     return self._neededHeuristics[benchmark]
 
 
-  def tearDown(self, benchmark, additionalParameters):
+  def tearDown(self, _, additionalParameters):
     candidates = additionalParameters["candidates"]
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]

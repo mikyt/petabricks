@@ -258,6 +258,7 @@ void loadDefaultHeuristics() {
   HeuristicManager& hm = HeuristicManager::instance();
   
   hm.registerDefault("UserRule_blockNumber", "2");
+  hm.setMin("UserRule_blockNumber", 2);
 }
 
 void findMainTransform(const TransformListPtr& t) {
