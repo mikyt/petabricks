@@ -282,7 +282,6 @@ class FormulaIf:
     return "if " + str(self.cond) + " then " + str(self.thenClause) + elsePart
     
   def evolve(self, min_val=float("-inf"), max_val=float("inf")):
-    print "START"
     choices = range(3)
     random.shuffle(choices)
     for choice in choices:

@@ -142,8 +142,6 @@ following attributes:
 
 
   def setup(self, benchmark, additionalParameters):
-    candidates = additionalParameters["candidates"]
-
     #Define file names
     path, basenameExt = os.path.split(benchmark)
     if path == "":
@@ -161,35 +159,19 @@ following attributes:
       os.makedirs(outDir)
     binary= os.path.join(outDir, basename)
     status = pbutil_support.compileBenchmark(self._pbcExe,
-                                   benchmark,
-                                   binary = binary,
-                                   jobs = self._jobs,
-                                   defaultHeuristics = True)
+                                             benchmark,
+                                             binary = binary,
+                                             jobs = self._jobs,
+                                             defaultHeuristics = True)
     if status != 0:
       logger.error("Compile FAILED with default heuristics - "
                    "Compilation aborted")
       return status
 
-    try:
-      sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
-
-      #Candidate has not failed: mark as such
-      currentCandidate = candidates[-1]
-      currentCandidate.failed = False
-      currentCandidate.assignScores = True
-
-
-    except tunerwarnings.AlwaysCrashes:
-      logger.error("Compilation with default heuristics always crashes!")
-      #Add an empty entry for the candidate
-      currentCandidate = learningframework.FailedCandidate()
-      candidates.append(currentCandidate)
-
     #Get the full set of used heuristics
     infoFile = binary+".info"
     currentDefaultHSet = learningframework.HeuristicSet()
     currentDefaultHSet.importFromXml(infoFile)
-    currentCandidate.heuristicSet = currentDefaultHSet
 
     #Store the list of needed heuristics for the current benchmark
     self._neededHeuristics[benchmark] = [heur.derive_needed_heuristic()

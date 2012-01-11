@@ -360,7 +360,7 @@ class CandidateList(list):
     self._sortingKey = sortingKey
 
   def addOriginalIndex(self):
-    count = 0
+    count = 1
     for candidate in self:
       candidate.originalIndex = count
       count = count + 1
