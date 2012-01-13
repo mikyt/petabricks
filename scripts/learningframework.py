@@ -6,6 +6,7 @@ import heuristicdb
 import copy
 import pprint
 import logging
+import mincemeat
 from xml.sax.saxutils import escape
 
 
@@ -18,6 +19,11 @@ CONF_EXPLORATION_PROBABILITY = 0.7
 CONF_PICK_BEST_N = 5
 #------------------------------------------
 
+def import_object(moduleName, objectName):
+  module = __import__(moduleName)
+  return getattr(module, objectName)
+  
+  
 class Error(Exception):
     """Base class for all the exceptions thrown by the learning framework"""
     pass
@@ -359,6 +365,25 @@ class CandidateList(list):
   def __init__(self, sortingKey):
     self._sortingKey = sortingKey
 
+    
+  def __getstate__(self):
+    state = self.__dict__.copy()
+    del state["_sortingKey"]
+    state["_sortingKey_module"] = self._sortingKey.__module__
+    state["_sortingKey_name"] = self._sortingKey.__name__
+    
+    
+  def __setstate__(self, state):
+    self.__dict__.update(state)
+    
+    moduleName = state["_sortingKey_module"]
+    del state["_sortingKey_module"]
+    functionName = state["_sortingKey_name"]
+    del state["_sortingKey_name"]
+    
+    self.__dict__["_sortingKey"] = import_object(moduleName, functionName)
+   
+
   def addOriginalIndex(self):
     count = 1
     for candidate in self:
@@ -373,31 +398,44 @@ class CandidateList(list):
 
 
 
+def _mapfn(count, job):
+    benchmark = job["benchmark"]
+    hset = job["hset"]
+    additional_parameters = job["additional_parameters"]
+    (testfn_module, testfn_name) = job["testfn"]
+    
+    #Import the function
+    module = __import__(testfn_module)
+    testfn = getattr(module, testfn_name)
+    
+    candidate = testfn(benchmark, count, hset, additional_parameters)
+                                        
+    yield "candidates", candidate
+      
+def _reducefn(_, value):
+    return value
 
-class Learner:
-  def __init__(self,
-               testHSet,
-               candidateSortingKey,
-               heuristicSetFileName = None,
-               setup = None,
-               tearDown = None,
-               getNeededHeuristics = None):
+
+class Learner(object):
+  _setup = None
+  _testHSet = None
+  _candidateSortingKey = None
+  _tearDown = None
+  
+  def _getNeededHeuristics(self, _):
+    return []
+    
+  
+  def __init__(self, heuristicSetFileName = None, use_mapreduce = False):
     self._heuristicManager = HeuristicManager(heuristicSetFileName)
     self._minTrialNumber = CONF_MIN_TRIAL_NUMBER
     self._db = heuristicdb.HeuristicDB()
-    self._setup = setup
-    self._testHSet = testHSet
-    self._candidateSortingKey = candidateSortingKey
-    self._tearDown = tearDown
 
+    self.use_mapreduce = use_mapreduce # TODO: modify the caller so that this 
+                                       # parameter can actually be set in some
+                                       # way (command line?)
     hSetsFromFile = self._heuristicManager.allHeuristicSets()
     self._db.addAsFavoriteCandidates(hSetsFromFile)
-
-    if getNeededHeuristics is None:
-      #Return an empty list
-      self._getNeededHeuristics = lambda : []
-    else:
-      self._getNeededHeuristics = getNeededHeuristics
 
     random.seed()
 
@@ -452,12 +490,52 @@ getting the current best heuristics, without modifying them"""
       pass
 
     return allHSets
+      
 
+  def _test_with_mapreduce(self, benchmark, all_hsets, additional_parameters):
+      testfn_module = self._testHSet.__module__
+      testfn_name = self._testHSet.__name__
+      
+      jobs = ({"benchmark" : benchmark,
+               "hset" : hset,
+               "additional_parameters" : additional_parameters,
+               "testfn" : (testfn_module, testfn_name)}
+              for hset in all_hsets )
+              
+      datasource = dict(enumerate(jobs, start=1))
+      pp = pprint.PrettyPrinter()
+      pp.pprint(datasource)
+      
+      server = mincemeat.Server()
+      server.datasource = datasource
+      server.mapfn = _mapfn
+      server.reducefn = _reducefn
+      
+      print "Waiting for mincemeat.py MapReduce workers"
+      results = server.run_server()
 
-
-
+      new_candidates = results["candidates"]
+      additional_parameters["candidates"].extend(new_candidates)
+  
+  
+  def _test_sequentially(self, benchmark, allHSets, additionalParameters):
+      """Test sequentially all the heuristic sets on the benchmark, storing the
+result inside the candidates list taken from the additional parameters"""
+      candidates = additionalParameters["candidates"]
+      
+      #self._testHSet is just a pointer to a function, but since it's inside 
+      #an object python understand it to be a method.
+      #Let's get back the function using im_func
+      testfn = self._testHSet.im_func
+          
+      count = 0
+      for hSet in allHSets:
+          count = count + 1
+          
+          currentCandidate = testfn(benchmark, count, hSet, additionalParameters)
+          candidates.append(currentCandidate)
+      
   def _generateAndTestHSets(self, benchmark, additionalParameters):
-    candidates = additionalParameters["candidates"]
     neededHeuristics = additionalParameters["neededHeuristics"]
 
     allHSets = []
@@ -481,19 +559,13 @@ getting the current best heuristics, without modifying them"""
 
       count = count + 1
 
-
-    count = 0
-    for hSet in allHSets:
-      count = count + 1
-      currentCandidate = self._testHSet(benchmark, count, hSet, additionalParameters)
-      candidates.append(currentCandidate)
-
-    if candidates[0].failed:
-      raise AllCandidatesCrashError
+    if self.use_mapreduce:
+        self._test_with_mapreduce(benchmark, allHSets, additionalParameters)
+    else:
+        self._test_sequentially(benchmark, allHSets, additionalParameters)
 
 
-
-  def useBestHeuristics(self, benchmark, learn=True):
+  def use_learning(self, benchmark, learn=True):
     logger.info("Using best heuristics on: %s", benchmark)
 
     #Init variables
@@ -517,6 +589,9 @@ getting the current best heuristics, without modifying them"""
 
     candidates.addOriginalIndex()
     candidates.sort()
+
+    if candidates[0].failed:
+        raise AllCandidatesCrashError
 
     if canLearn and learn:
         logger.info("Storing learning results in the DB")
