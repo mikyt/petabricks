@@ -312,7 +312,8 @@ class ServerChannel(Protocol):
         """Handle disconnection of a client"""
         logging.info("Client disconnected")
         
-        if self._last_command != "disconnect":
+        if (self._last_command is not None and
+	   self._last_command != "disconnect"):
             #The client did not disconnect as a result of a shutdown request
             #Something went wrong
             #Put the job back on the list
