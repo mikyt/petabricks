@@ -58,6 +58,7 @@ class Protocol(asynchat.async_chat):
         self.buffer = []
         self.auth = None
         self.mid_command = False
+        self.password = ""
 
     def collect_incoming_data(self, data):
         self.buffer.append(data)
@@ -103,12 +104,15 @@ class Protocol(asynchat.async_chat):
         self.auth = os.urandom(20).encode("hex")
         self.send_command(":".join(["challenge", self.auth]))
 
-    def respond_to_challenge(self, command, data):
+    def respond_to_challenge(self, unused_command, data):
         mac = hmac.new(self.password, data, hashlib.sha1)
         self.send_command(":".join(["auth", mac.digest().encode("hex")]))
         self.post_auth_init()
 
-    def verify_auth(self, command, data):
+    def post_auth_init(self):
+        raise RuntimeError("Should be overridden by the subclass")
+    
+    def verify_auth(self, unused_command, data):
         mac = hmac.new(self.password, self.auth, hashlib.sha1)
         if data == mac.digest().encode("hex"):
             self.auth = "Done"
@@ -119,7 +123,7 @@ class Protocol(asynchat.async_chat):
     def process_command(self, command, data=None):
         commands = {
             'challenge': self.respond_to_challenge,
-            'disconnect': lambda x, y: self.handle_close(),
+            'disconnect': lambda unused_x, unused_y: self.handle_close(),
             }
 
         if command in commands:
@@ -132,7 +136,7 @@ class Protocol(asynchat.async_chat):
         commands = {
             'challenge': self.respond_to_challenge,
             'auth': self.verify_auth,
-            'disconnect': lambda x, y: self.handle_close(),
+            'disconnect': lambda unused_x, unused_y: self.handle_close(),
             }
 
         if command in commands:
@@ -158,16 +162,16 @@ class Client(Protocol):
     def handle_close(self):
         self.close()
 
-    def set_mapfn(self, command, mapfn):
+    def set_mapfn(self, unused_command, mapfn):
         self.mapfn = types.FunctionType(marshal.loads(mapfn), globals(), 'mapfn')
 
-    def set_collectfn(self, command, collectfn):
+    def set_collectfn(self, unused_command, collectfn):
         self.collectfn = types.FunctionType(marshal.loads(collectfn), globals(), 'collectfn')
 
-    def set_reducefn(self, command, reducefn):
+    def set_reducefn(self, unused_command, reducefn):
         self.reducefn = types.FunctionType(marshal.loads(reducefn), globals(), 'reducefn')
 
-    def call_mapfn(self, command, data):
+    def call_mapfn(self, unused_command, data):
         logging.info("Mapping %s" % str(data[0]))
         results = {}
         for k, v in self.mapfn(data[0], data[1]):
@@ -179,11 +183,12 @@ class Client(Protocol):
                 results[k] = [self.collectfn(k, results[k])]
         self.send_command('mapdone', (data[0], results))
 
-    def wait(self, command, data):
+    def wait(self, unused_command, unused_data):
+        logging.debug("Waiting for 1 second")
         time.sleep(1)
         self.send_command('waitdone', None)
         
-    def call_reducefn(self, command, data):
+    def call_reducefn(self, unused_command, data):
         logging.info("Reducing %s" % str(data[0]))
         results = self.reducefn(data[0], data[1])
         self.send_command('reducedone', (data[0], results))
@@ -243,6 +248,8 @@ Attributes:
         self.relaunch_map = True
         self.relaunch_reduce = True
         
+        self.taskmanager = TaskManager(self)
+        
         
     def __del__(self):
         self.close()
@@ -273,15 +280,11 @@ Attributes:
         self._datasource = ds
         if ds is None:
             return
-            
-        if hasattr(self, "taskmanager") and self.taskmanager is not None:
-            self.taskmanager.reset_datasource(self._datasource)
-        else:
-            self.taskmanager = TaskManager(self._datasource, self.relaunch_map, self.relaunch_reduce)
-            
-        while self.taskmanager.has_work_to_do():
-            time.sleep(1)
-
+        
+        data_processed = threading.Event()
+        self.taskmanager.process_datasource(self._datasource, data_processed, self.relaunch_map, self.relaunch_reduce)
+        data_processed.wait()
+        
         return self.taskmanager.results
         
     def get_datasource(self):
@@ -333,28 +336,21 @@ class ServerChannel(Protocol):
         self._last_command_data = data
         
     def start_new_task(self):
-        while (not hasattr(self.server, "taskmanager")
-               or self.server.taskmanager is None):
-            time.sleep(1)
-            
-        while not self.server.taskmanager.has_work_to_do():
-            time.sleep(1)
-            
-        command, data = self.server.taskmanager.next_task(self)
+        command, data = self.server.taskmanager.next_task()
         if command == None:
             return
         self.save_as_last_sent(command, data)
         self.send_command(command, data)
 
-    def map_done(self, command, data):
+    def map_done(self, unused_command, data):
         self.server.taskmanager.map_done(data)
         self.start_new_task()
 
-    def reduce_done(self, command, data):
+    def reduce_done(self, unused_command, data):
         self.server.taskmanager.reduce_done(data)
         self.start_new_task()
 
-    def wait_done(self, command, data):
+    def wait_done(self, unused_command, unused_data):
         self.start_new_task()
         
     def process_command(self, command, data=None):
@@ -385,21 +381,19 @@ class TaskManager:
     WAITING = 3
     FINISHED = 4
 
-    def __init__(self, datasource, server, relaunch_map=True, 
-                 relaunch_reduce=True):
+    def __init__(self, server):
         self.server = server
-        self.reset_datasource(datasource)
+        self.state = TaskManager.WAITING
+        self.datasource = None
+
+    def process_datasource(self, datasource, data_processed_event, relaunch_map=True, relaunch_reduce=True):
+        self.datasource = datasource
+        self.data_processed_event = data_processed_event
         self.relaunch_map = relaunch_map
         self.relaunch_reduce = relaunch_reduce
-
-    def reset_datasource(self, datasource):
-        self.datasource = datasource
         self.state = TaskManager.START
-        
-    def has_work_to_do(self):
-        return self.state < TaskManager.WAITING
     
-    def next_task(self, channel):
+    def next_task(self):
         def map_command(map_key, map_data):
             """Add the computation to the working maps and return the 
                map command"""
@@ -408,69 +402,66 @@ class TaskManager:
             return ('map', map_item)
         
         # Body of the function
-        while True: 
-            #The "while True" ensures that the function will come back here
-            #after exiting from a WAITING state, and check all the possible
-            #states again
-            if self.state == TaskManager.START:
-                self.map_iter = iter(self.datasource)
-                self.working_maps = {}
-                self.map_results = {}
-                self.redo_maps = {}
-                self.redo_reduces = {}
-                #self.waiting_for_maps = []
-                self.state = TaskManager.MAPPING
-            if self.state == TaskManager.MAPPING:
-                try:
-                    map_key = self.map_iter.next()
-                    map_data = self.datasource[map_key]
-                    return map_command(map_key, map_data)
-                except StopIteration:
-                    if len(self.redo_maps) > 0:
-                        #Relaunch failed computations
-                        key = random.choice(self.redo_maps.keys())
-                        data = self.redo_maps[key]
-                        del self.redo_maps[key]
-                        return map_command(key, data)
-                    if len(self.working_maps) > 0:
-                        if self.relaunch_map:
-                            #Relaunch the remaining computations multiple times
-                            key = random.choice(self.working_maps.keys())
-                            return ('map', (key, self.working_maps[key]))
-                        else:
-                            #Nothing to do: just wait for the other computations
-                            return ('wait', None)
-                    #Else: all mapping done
-                    self.state = TaskManager.REDUCING
-                    self.reduce_iter = self.map_results.iteritems()
-                    self.working_reduces = {}
-                    self.results = {}
-            if self.state == TaskManager.REDUCING:
-                try:
-                    reduce_item = self.reduce_iter.next()
-                    self.working_reduces[reduce_item[0]] = reduce_item[1]
-                    return ('reduce', reduce_item)
-                except StopIteration:
-                    if len(self.redo_reduces) > 0:
-                        #Relaunch failed computations
-                        key = random.choice(self.redo_reduces.keys())
-                        data = self.redo_reduces[key]
-                        del self.redo_reduces[key]
-                        return ('reduce', (key, data))
-                    if len(self.working_reduces) > 0:
-                        if self.relaunch_reduce:
-                            key = random.choice(self.working_reduces.keys())
-                            return ('reduce', (key, self.working_reduces[key]))
-                        else:
-                            return ('wait', None)
-                    #Else: all reductions done
-                    self.state = TaskManager.WAITING
-            while self.state == TaskManager.WAITING:
-                time.sleep(1)
-            if self.state == TaskManager.FINISHED:
-                self.server.handle_close()
-                return ('disconnect', None)
-    
+        if self.state == TaskManager.START:
+            self.map_iter = iter(self.datasource)
+            self.working_maps = {}
+            self.map_results = {}
+            self.redo_maps = {}
+            self.redo_reduces = {}
+            #self.waiting_for_maps = []
+            self.state = TaskManager.MAPPING
+        if self.state == TaskManager.MAPPING:
+            try:
+                map_key = self.map_iter.next()
+                map_data = self.datasource[map_key]
+                return map_command(map_key, map_data)
+            except StopIteration:
+                if len(self.redo_maps) > 0:
+                    #Relaunch failed computations
+                    key = random.choice(self.redo_maps.keys())
+                    data = self.redo_maps[key]
+                    del self.redo_maps[key]
+                    return map_command(key, data)
+                if len(self.working_maps) > 0:
+                    if self.relaunch_map:
+                        #Relaunch the remaining computations multiple times
+                        key = random.choice(self.working_maps.keys())
+                        return ('map', (key, self.working_maps[key]))
+                    else:
+                        #Nothing to do: just wait for the other computations
+                        return ('wait', None)
+                #Else: all mapping done
+                self.state = TaskManager.REDUCING
+                self.reduce_iter = self.map_results.iteritems()
+                self.working_reduces = {}
+                self.results = {}
+        if self.state == TaskManager.REDUCING:
+            try:
+                reduce_item = self.reduce_iter.next()
+                self.working_reduces[reduce_item[0]] = reduce_item[1]
+                return ('reduce', reduce_item)
+            except StopIteration:
+                if len(self.redo_reduces) > 0:
+                    #Relaunch failed computations
+                    key = random.choice(self.redo_reduces.keys())
+                    data = self.redo_reduces[key]
+                    del self.redo_reduces[key]
+                    return ('reduce', (key, data))
+                if len(self.working_reduces) > 0:
+                    if self.relaunch_reduce:
+                        key = random.choice(self.working_reduces.keys())
+                        return ('reduce', (key, self.working_reduces[key]))
+                    else:
+                        return ('wait', None)
+                #Else: all reductions done
+                self.state = TaskManager.WAITING
+                self.data_processed_event.set()
+        if self.state == TaskManager.WAITING:
+            return ('wait', None)
+        if self.state == TaskManager.FINISHED:
+            self.server.handle_close()
+            return ('disconnect', None)
+
     
     def redo_map(self, map_item):
         """A client has failed during a map. Put the data back so that the job
