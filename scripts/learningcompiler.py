@@ -20,34 +20,115 @@ CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #----------------------------------------------
 
+
 logger = logging.getLogger(__name__)
 
 
-def candidateKey(candidate):
-  """Generates a comparison key for a candidate.
-Candidates are sorted by the number of dimensions (the highest, the better),
-then by average execution time of the biggest dimension (the lower the better)"""
-  if candidate.failed:
-    return (float('inf'), float('inf'))
-  numDimensions = len(candidate.metrics[0])
-  executionTime = candidate.metrics[0][2**(numDimensions-1)].mean()
-  return (1.0 / numDimensions, executionTime)
+def test_heuristic_set(benchmark, count, hSet, additionalParameters):
+    """Return the object representing a tested candidate, with (at least) the
+following attributes:
+
+  * failed (bool): has the candidate failed the compilation/testing process?
+  * assignScores (bool): should the score be assigned to the candidate normally
+                         or should we just mark it as used (thus penalizing it)
+  * heuristicSet (HeuristicSet): the set of heuristics that generated the
+                                 program"""
+                   
+    candidates=[]
+    candidate = None
+    basesubdir = additionalParameters["basesubdir"]
+    basename = additionalParameters["basename"]
+    pbc_exe = additionalParameters["pbc_exe"]
+    jobs = additionalParameters["num_compilation_jobs"]
+    max_tuning_size = additionalParameters["max_tuning_size"]
+    max_tuning_time = additionalParameters["max_tuning_time"]
+    dirnumber = count + 1
+    print "Testing candidate %d" % dirnumber #TODO: remove
+    #Define more file names
+
+    outDir = os.path.join(basesubdir, str(dirnumber))
+    if not os.path.isdir(outDir):
+      #Create the output directory
+      os.makedirs(outDir)
+    binary= os.path.join(outDir, basename)
+
+    heuristicsFile= os.path.join(outDir, CONF_HEURISTIC_FILE_NAME)
+    hSet.toXmlFile(heuristicsFile)
+
+    status = pbutil_support.compileBenchmark(pbc_exe,
+                                     benchmark,
+                                     binary = binary,
+                                     heuristics = heuristicsFile,
+                                     jobs = jobs,
+                                     timeout = CONF_TIMEOUT)
+    if status != 0:
+      #Compilation has failed!
+      #Take the data about the heuristics from the input heuristics file
+      #instead of the info file (because there no such file!).
+      #We are not sure that all the heuristics in the input
+      #file have been used, but they had the compilation fail.
+      #Their score is not increased, but they are marked as used
+      #(and therefore they are penalized)
+      logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
+      logger.warning(str(hSet))
+      return learningframework.FailedCandidate(hSet, assignScores = False)
 
 
-class LearningCompiler(object):
+    #Autotune
+    try:
+      sgatuner.autotune_withparams(binary, candidates, n=max_tuning_size, 
+                                   max_time=max_tuning_time)
+
+      #Candidate has not failed: mark as such
+      tunedCandidate = candidates[-1]
+
+    except tunerwarnings.AlwaysCrashes:
+      logger.warning("Candidate %d always crashes during tuning with hset:", dirnumber)
+      logger.warning(str(hSet))
+      return learningframework.FailedCandidate(hSet, assignScores = True)
+
+    #Store the actually used hSet inside the candidate
+    infoFile = os.path.join(basesubdir,
+                            str(dirnumber),
+                            basename+".info")
+    hSet = learningframework.HeuristicSet()
+    hSet.importFromXml(infoFile)
+    
+
+    candidate = learningframework.SuccessfulCandidate(hSet)
+    
+    candidate.numDimensions = len(tunedCandidate.metrics[0])
+    candidate.executionTime = tunedCandidate.metrics[0][2**(candidate.numDimensions-1)].mean()
+    candidate.heuristicSet = hSet
+    candidate.failed = False
+    candidate.assignScores = True
+
+    return candidate
+    
+    
+    
+class LearningCompiler(learningframework.Learner):
+  _testHSet = test_heuristic_set
+  
   def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
                maxTuningTime=CONF_MAX_TIME):
-    self._learner = learningframework.Learner(self.testHSet,
-                                              candidateKey,
-                                              heuristicSetFileName,
-                                              self.setup,
-                                              self.tearDown,
-                                              self.getNeededHeuristics)
+    super(LearningCompiler, self).__init__(heuristicSetFileName, 
+                                           use_mapreduce=True)
+    
     self._pbcExe = pbcExe
     self._jobs = jobs
     self._n = n
     self._maxTuningTime = maxTuningTime
 
+  @staticmethod
+  def _candidateSortingKey(candidate):
+      """Generates a comparison key for a candidate.
+    Candidates are sorted by the number of dimensions (the highest, the better),
+    then by average execution time of the biggest dimension (the lower the better)"""
+      if candidate.failed:
+        return (float('inf'), float('inf'))      
+      return (1.0 / candidate.numDimensions, candidate.executionTime)
+  
   def _getMaxTuningSize(self):
       return self._n
 
@@ -67,81 +148,10 @@ class LearningCompiler(object):
     self._finalBinary = finalBinary
     self._neededHeuristics={}
 
-    return self._learner.useBestHeuristics(benchmark, learn)
+    return self.use_learning(benchmark, learn)
+    
 
-
-  def testHSet(self, benchmark, count, hSet, additionalParameters):
-    """Return the object representing a tested candidate, with (at least) the
-following attributes:
-
-  * failed (bool): has the candidate failed the compilation/testing process?
-  * assignScores (bool): should the score be assigned to the candidate normally
-                         or should we just mark it as used (thus penalizing it)
-  * heuristicSet (HeuristicSet): the set of heuristics that generated the
-                                 program"""
-    candidates=[]
-    candidate = None
-    basesubdir = additionalParameters["basesubdir"]
-    basename = additionalParameters["basename"]
-
-    #Define more file names
-
-    outDir = os.path.join(basesubdir, str(count))
-    if not os.path.isdir(outDir):
-      #Create the output directory
-      os.makedirs(outDir)
-    binary= os.path.join(outDir, basename)
-
-    heuristicsFile= os.path.join(outDir, CONF_HEURISTIC_FILE_NAME)
-    hSet.toXmlFile(heuristicsFile)
-
-    status = pbutil_support.compileBenchmark(self._pbcExe,
-                                     benchmark,
-                                     binary = binary,
-                                     heuristics = heuristicsFile,
-                                     jobs = self._jobs,
-                                     timeout = CONF_TIMEOUT)
-    if status != 0:
-      #Compilation has failed!
-      #Take the data about the heuristics from the input heuristics file
-      #instead of the info file (because there no such file!).
-      #We are not sure that all the heuristics in the input
-      #file have been used, but they had the compilation fail.
-      #Their score is not increased, but they are marked as used
-      #(and therefore they are penalized)
-      logger.warning("Compile FAILED while using heuristic set #%d:", count)
-      logger.warning(str(hSet))
-      return learningframework.FailedCandidate(hSet, assignScores = False)
-
-
-    #Autotune
-    try:
-      sgatuner.autotune_withparams(binary, candidates, n=self._n, max_time=self._maxTuningTime)
-
-      #Candidate has not failed: mark as such
-      candidate = candidates[-1]
-
-    except tunerwarnings.AlwaysCrashes:
-      logger.warning("Candidate %d always crashes during tuning with hset:", count)
-      logger.warning(str(hSet))
-      return learningframework.FailedCandidate(hSet, assignScores = True)
-
-    #Store the actually used hSet inside the candidate
-    infoFile = os.path.join(basesubdir,
-                            str(count),
-                            basename+".info")
-    hSet = learningframework.HeuristicSet()
-    hSet.importFromXml(infoFile)
-
-    candidate.heuristicSet = hSet
-    candidate.failed = False
-    candidate.assignScores = True
-
-    return candidate
-
-
-
-  def setup(self, benchmark, additionalParameters):
+  def _setup(self, benchmark, additionalParameters):
     #Define file names
     path, basenameExt = os.path.split(benchmark)
     if path == "":
@@ -151,6 +161,10 @@ following attributes:
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
     additionalParameters["path"] = path
+    additionalParameters["pbc_exe"] = self._pbcExe
+    additionalParameters["num_compilation_jobs"] = self._jobs
+    additionalParameters["max_tuning_size"] = self._n
+    additionalParameters["max_tuning_time"] = self._maxTuningTime
 
     #Compile with default heuristics
     outDir = os.path.join(basesubdir, "0")
@@ -181,11 +195,11 @@ following attributes:
     return 0
 
 
-  def getNeededHeuristics(self, benchmark):
+  def _getNeededHeuristics(self, benchmark):
     return self._neededHeuristics[benchmark]
 
 
-  def tearDown(self, _, additionalParameters):
+  def _tearDown(self, _, additionalParameters):
     candidates = additionalParameters["candidates"]
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]
@@ -226,8 +240,6 @@ following attributes:
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:
       shutil.rmtree(basesubdir)
-
-
 
 
 
