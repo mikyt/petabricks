@@ -52,7 +52,8 @@ class FailedCandidate(Candidate):
 If assignScores is False, when this candidate is graded it's only marked as used
 but not given any point (thus it is penalized)"""
   def __init__(self, heuristicSet = None, assignScores = True):
-    Candidate.__init__(self, heuristicSet, failed=True, assignScores=assignScores, originalIndex=None)
+    Candidate.__init__(self, heuristicSet, failed=True, 
+                       assignScores=assignScores, originalIndex=None)
     if heuristicSet is None:
       self.heuristicSet = HeuristicSet()
     else:
@@ -62,7 +63,8 @@ but not given any point (thus it is penalized)"""
 class SuccessfulCandidate(Candidate):
   """Represents a candidate that was executed correctly"""
   def __init__(self, heuristicSet):
-    Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, originalIndex=None)
+    Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, 
+                       originalIndex=None)
 
 
 class NeededHeuristic(object):
@@ -348,7 +350,7 @@ Removes every other heuristic"""
     self._heuristicSets = copy.deepcopy(self._heuristicSetsInFile)
 
   def _parseHeuristicSet(self, hSetXML):
-    """Parses a xml heuristic set returning it as a list of pairs name-formula"""
+    "Parses a xml heuristic set returning it as a list of pairs name-formula"
     hSet = HeuristicSet()
     hSet.importFromXmlDOM(hSetXML)
     return hSet
@@ -431,9 +433,16 @@ class Learner(object):
     self._minTrialNumber = CONF_MIN_TRIAL_NUMBER
     self._db = heuristicdb.HeuristicDB()
 
-    self.use_mapreduce = use_mapreduce # TODO: modify the caller so that this 
-                                       # parameter can actually be set in some
-                                       # way (command line?)
+    self.use_mapreduce = use_mapreduce 
+    
+    if use_mapreduce:
+        self._server = mincemeat.Server()
+        self._server.mapfn = _mapfn
+        self._server.reducefn = _reducefn
+        self._server.relaunch_map = False
+        self._server.relaunch_reduce = False
+        self._server.start()
+                                       
     hSetsFromFile = self._heuristicManager.allHeuristicSets()
     self._db.addAsFavoriteCandidates(hSetsFromFile)
 
@@ -502,17 +511,13 @@ getting the current best heuristics, without modifying them"""
                "testfn" : (testfn_module, testfn_name)}
               for hset in all_hsets )
               
-      datasource = dict(enumerate(jobs, start=1))
+      datasource = dict(enumerate(jobs))
+      
       pp = pprint.PrettyPrinter()
       pp.pprint(datasource)
       
-      server = mincemeat.Server()
-      server.datasource = datasource
-      server.mapfn = _mapfn
-      server.reducefn = _reducefn
-      
       print "Waiting for mincemeat.py MapReduce workers"
-      results = server.run_server()
+      results = self._server.process_datasource(datasource)
 
       new_candidates = results["candidates"]
       additional_parameters["candidates"].extend(new_candidates)
@@ -532,7 +537,8 @@ result inside the candidates list taken from the additional parameters"""
       for hSet in allHSets:
           count = count + 1
           
-          currentCandidate = testfn(benchmark, count, hSet, additionalParameters)
+          currentCandidate = testfn(benchmark, count, hSet, 
+                                    additionalParameters)
           candidates.append(currentCandidate)
       
   def _generateAndTestHSets(self, benchmark, additionalParameters):

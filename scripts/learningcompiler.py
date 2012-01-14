@@ -20,6 +20,7 @@ CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #----------------------------------------------
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,10 +42,11 @@ following attributes:
     jobs = additionalParameters["num_compilation_jobs"]
     max_tuning_size = additionalParameters["max_tuning_size"]
     max_tuning_time = additionalParameters["max_tuning_time"]
-    
+    dirnumber = count + 1
+    print "Testing candidate %d" % dirnumber #TODO: remove
     #Define more file names
 
-    outDir = os.path.join(basesubdir, str(count))
+    outDir = os.path.join(basesubdir, str(dirnumber))
     if not os.path.isdir(outDir):
       #Create the output directory
       os.makedirs(outDir)
@@ -67,7 +69,7 @@ following attributes:
       #file have been used, but they had the compilation fail.
       #Their score is not increased, but they are marked as used
       #(and therefore they are penalized)
-      logger.warning("Compile FAILED while using heuristic set #%d:", count)
+      logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
       logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = False)
 
@@ -81,13 +83,13 @@ following attributes:
       tunedCandidate = candidates[-1]
 
     except tunerwarnings.AlwaysCrashes:
-      logger.warning("Candidate %d always crashes during tuning with hset:", count)
+      logger.warning("Candidate %d always crashes during tuning with hset:", dirnumber)
       logger.warning(str(hSet))
       return learningframework.FailedCandidate(hSet, assignScores = True)
 
     #Store the actually used hSet inside the candidate
     infoFile = os.path.join(basesubdir,
-                            str(count),
+                            str(dirnumber),
                             basename+".info")
     hSet = learningframework.HeuristicSet()
     hSet.importFromXml(infoFile)
@@ -110,7 +112,8 @@ class LearningCompiler(learningframework.Learner):
   
   def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
                maxTuningTime=CONF_MAX_TIME):
-    super(LearningCompiler, self).__init__(heuristicSetFileName, use_mapreduce=False)
+    super(LearningCompiler, self).__init__(heuristicSetFileName, 
+                                           use_mapreduce=True)
     
     self._pbcExe = pbcExe
     self._jobs = jobs
@@ -237,8 +240,6 @@ class LearningCompiler(learningframework.Learner):
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:
       shutil.rmtree(basesubdir)
-
-
 
 
 
