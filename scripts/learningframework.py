@@ -37,7 +37,7 @@ class Candidate:
   """Represents a learning candidate. Objects can be considered candidate
 if they have this set of attributes.
 They do NOT need to inherit from this class"""
-  def __init__(self, heuristicSet, failed, assignScores, originalIndex):
+  def __init__(self, heuristicSet, failed, assignScores):
     if heuristicSet is None:
       self.heuristicSet = HeuristicSet()
     else:
@@ -45,7 +45,45 @@ They do NOT need to inherit from this class"""
 
     self.failed = failed
     self.assignScores = assignScores
-    self.originalIndex = originalIndex
+    self.originalIndex = None
+    
+  def _extra_repr(self):
+    """Print all the fields that have been added to the candidate"""
+    extra = []
+    for key in self.__dict__:
+        if key not in ['__doc__',
+                       '__init__',
+                       '__module__',
+                       '__repr__',
+                       '_extra_repr',
+                       'assignScores',
+                       'failed',
+                       'heuristicSet',
+                       'originalIndex']:
+            extra.append("%s: %s" % (key, self.__dict__[key]))
+
+    return "\n".join(extra)
+    
+  
+  def __repr__(self):
+    if self.failed:
+      failed_str = "FAILED"
+    else:
+      failed_str = "Successful"
+      
+    return ("------------------------------------\n"
+            "Candidate: %s\n"
+            "  assignScores: %s\n"
+            "  originalIndex: %s\n"
+            "  Heuristic set: %s\n"
+            "%s\n"
+            "------------------------------------\n"
+            ) % (failed_str,
+                 self.assignScores,
+                 self.originalIndex,
+                 self.heuristicSet,
+                 self._extra_repr())
+					
 
 class FailedCandidate(Candidate):
   """Represents a candidate that failed during compilation or tuning.
@@ -53,18 +91,13 @@ If assignScores is False, when this candidate is graded it's only marked as used
 but not given any point (thus it is penalized)"""
   def __init__(self, heuristicSet = None, assignScores = True):
     Candidate.__init__(self, heuristicSet, failed=True, 
-                       assignScores=assignScores, originalIndex=None)
-    if heuristicSet is None:
-      self.heuristicSet = HeuristicSet()
-    else:
-      self.heuristicSet = heuristicSet
+                       assignScores=assignScores)
 
 
 class SuccessfulCandidate(Candidate):
   """Represents a candidate that was executed correctly"""
   def __init__(self, heuristicSet):
-    Candidate.__init__(self, heuristicSet, failed=False, assignScores=True, 
-                       originalIndex=None)
+    Candidate.__init__(self, heuristicSet, failed=False, assignScores=True)
 
 
 class NeededHeuristic(object):
@@ -384,13 +417,6 @@ class CandidateList(list):
     del state["_sortingKey_name"]
     
     self.__dict__["_sortingKey"] = import_object(moduleName, functionName)
-   
-
-  def addOriginalIndex(self):
-    count = 1
-    for candidate in self:
-      candidate.originalIndex = count
-      count = count + 1
 
   def sort(self):
     #Call sort() of "list"
@@ -411,7 +437,7 @@ def _mapfn(count, job):
     testfn = getattr(module, testfn_name)
     
     candidate = testfn(benchmark, count, hset, additional_parameters)
-                                        
+    candidate.originalIndex = count                                    
     yield "candidates", candidate
       
 def _reducefn(_, value):
@@ -451,8 +477,7 @@ class Learner(object):
 
   def storeCandidatesDataInDB(self, candidates):
     """Store data from all the info file, with score.
-The candidates should already be ordered (from the best to the worst) and
-with the originalIndex field added"""
+The candidates should already be ordered (from the best to the worst)"""
     numCandidates = len(candidates)
     count = 0
     for candidate in candidates:
@@ -539,6 +564,7 @@ result inside the candidates list taken from the additional parameters"""
           
           currentCandidate = testfn(benchmark, count, hSet, 
                                     additionalParameters)
+          currentCandidate.originalIndex = count
           candidates.append(currentCandidate)
       
   def _generateAndTestHSets(self, benchmark, additionalParameters):
@@ -593,7 +619,6 @@ result inside the candidates list taken from the additional parameters"""
     if canLearn:
       self._generateAndTestHSets(benchmark, additionalParameters)
 
-    candidates.addOriginalIndex()
     candidates.sort()
 
     if candidates[0].failed:

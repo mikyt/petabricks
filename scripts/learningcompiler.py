@@ -24,6 +24,7 @@ CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 logger = logging.getLogger(__name__)
 
 
+  
 def test_heuristic_set(benchmark, count, hSet, additionalParameters):
     """Return the object representing a tested candidate, with (at least) the
 following attributes:
@@ -99,9 +100,6 @@ following attributes:
     
     candidate.numDimensions = len(tunedCandidate.metrics[0])
     candidate.executionTime = tunedCandidate.metrics[0][2**(candidate.numDimensions-1)].mean()
-    candidate.heuristicSet = hSet
-    candidate.failed = False
-    candidate.assignScores = True
 
     return candidate
     
@@ -205,7 +203,10 @@ class LearningCompiler(learningframework.Learner):
     basename = additionalParameters["basename"]
     path = additionalParameters["path"]
 
-    bestIndex = candidates[0].originalIndex
+    import pprint
+    pp = pprint.PrettyPrinter()
+    logger.debug(pp.pformat(candidates))
+    bestIndex = candidates[0].originalIndex + 1
     logger.info("The best candidate is: %d", bestIndex)
 
     #Move every file to the right place
@@ -232,10 +233,9 @@ class LearningCompiler(learningframework.Learner):
       shutil.rmtree(destObjDir)
     shutil.move(bestObjDir, destObjDir)
     #  input heuristic file
-    if bestIndex != 0: #Program 0 is run with only the best heuristics in the DB
-      bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
-      finalHeurFile = finalBin+".heur"
-      shutil.move(bestHeurFile, finalHeurFile)
+    bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
+    finalHeurFile = finalBin+".heur"
+    shutil.move(bestHeurFile, finalHeurFile)
 
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:

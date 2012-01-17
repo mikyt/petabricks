@@ -447,6 +447,7 @@ class TaskManager:
                     key = random.choice(self.redo_reduces.keys())
                     data = self.redo_reduces[key]
                     del self.redo_reduces[key]
+                    self.working_reduces[key] = data
                     return ('reduce', (key, data))
                 if len(self.working_reduces) > 0:
                     if self.relaunch_reduce:
