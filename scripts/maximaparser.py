@@ -57,6 +57,10 @@ precedence = (
   ('left', '^'),
 )
 
+def p_start(p):
+  r'Start : Formula'
+  p[0] = FormulaContainer(p[1])
+    
 def p_formula_IDENT(p):
   r'Formula : IDENT'
   p[0]=FormulaVariable(p[1])

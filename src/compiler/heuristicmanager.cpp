@@ -28,6 +28,19 @@
 #include "tinyxml.h"
 
 petabricks::HeuristicPtr& petabricks::HeuristicManager::getDefaultHeuristic(const std::string name) {
+  HeuristicPtr& heuristic = internal_getDefaultHeuristic(name);
+  _usedHeuristics[name] = heuristic;
+  return heuristic;
+}
+
+
+petabricks::HeuristicPtr& petabricks::HeuristicManager::getHeuristic(const std::string name) {
+  HeuristicPtr& heuristic = internal_getHeuristic(name);
+  _usedHeuristics[name] = heuristic;
+  return heuristic;
+}
+
+petabricks::HeuristicPtr& petabricks::HeuristicManager::internal_getDefaultHeuristic(const std::string name) {
   HeuristicMap::iterator found = _defaultHeuristics.find(name);
   //Found! Store in cache and return
   if (found != _defaultHeuristics.end()) {
@@ -40,10 +53,9 @@ petabricks::HeuristicPtr& petabricks::HeuristicManager::getDefaultHeuristic(cons
   abort();
 }
 
-
-petabricks::HeuristicPtr& petabricks::HeuristicManager::getHeuristic(const std::string name) {  
+petabricks::HeuristicPtr& petabricks::HeuristicManager::internal_getHeuristic(const std::string name) {  
   if (_useDefaultHeuristics) {
-    return getDefaultHeuristic(name);
+    return internal_getDefaultHeuristic(name);
   }
   
   //From cache

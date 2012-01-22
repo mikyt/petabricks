@@ -106,7 +106,7 @@ following attributes:
     
     
 class LearningCompiler(learningframework.Learner):
-  _testHSet = test_heuristic_set
+  _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
                maxTuningTime=CONF_MAX_TIME):
@@ -144,7 +144,8 @@ class LearningCompiler(learningframework.Learner):
   
   def compileProgram(self, benchmark, finalBinary = None, learn=True):
     self._finalBinary = finalBinary
-    self._neededHeuristics={}
+    self._neededHeuristics=[]
+    self._availablefeatures = None
 
     return self.use_learning(benchmark, learn)
     
@@ -180,22 +181,33 @@ class LearningCompiler(learningframework.Learner):
                    "Compilation aborted")
       return status
 
-    #Get the full set of used heuristics
+    #Get the full set of used heuristics and available features
     infoFile = binary+".info"
     currentDefaultHSet = learningframework.HeuristicSet()
     currentDefaultHSet.importFromXml(infoFile)
-
+    self._availablefeatures = learningframework.AvailableFeatures()
+    self._availablefeatures.importFromXml(infoFile)
+    
     #Store the list of needed heuristics for the current benchmark
-    self._neededHeuristics[benchmark] = [heur.derive_needed_heuristic()
-                                         for _, heur 
-                                         in currentDefaultHSet.iteritems()]
+    self._neededHeuristics = []
+    for name, heur in currentDefaultHSet.iteritems():
+        available_features = self._get_available_features(benchmark, name)
+        neededheur = heur.derive_needed_heuristic(available_features)
+        self._neededHeuristics.append(neededheur)
 
     return 0
 
 
-  def _getNeededHeuristics(self, benchmark):
-    return self._neededHeuristics[benchmark]
+  def _getNeededHeuristics(self, unused_benchmark):
+    return self._neededHeuristics
 
+
+  def _get_available_features(self, unused_benchmark, heuristic_name=None):
+      if heuristic_name is not None:
+          return self._availablefeatures[heuristic_name]
+         
+      return self._availablefeatures
+      
 
   def _tearDown(self, _, additionalParameters):
     candidates = additionalParameters["candidates"]
@@ -206,7 +218,11 @@ class LearningCompiler(learningframework.Learner):
     import pprint
     pp = pprint.PrettyPrinter()
     logger.debug(pp.pformat(candidates))
-    bestIndex = candidates[0].originalIndex + 1
+    if len(candidates) != 0:
+        bestIndex = candidates[0].originalIndex + 1
+    else:
+        #No need for heuristics: just use the default executable
+        bestIndex = 0
     logger.info("The best candidate is: %d", bestIndex)
 
     #Move every file to the right place
@@ -218,10 +234,6 @@ class LearningCompiler(learningframework.Learner):
     else:
       finalBin = os.path.join(path, basename)
     shutil.move(bestBin, finalBin)
-    #  .cfg file
-    bestCfg = os.path.join(bestSubDir, basename+".cfg")
-    finalCfg = finalBin + ".cfg"
-    shutil.move(bestCfg, finalCfg)
     #  .info file
     bestInfo = os.path.join(bestSubDir, basename+".info")
     finalInfo = finalBin+".info"
@@ -232,14 +244,22 @@ class LearningCompiler(learningframework.Learner):
     if os.path.isdir(destObjDir):
       shutil.rmtree(destObjDir)
     shutil.move(bestObjDir, destObjDir)
-    #  input heuristic file
-    bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
-    finalHeurFile = finalBin+".heur"
-    shutil.move(bestHeurFile, finalHeurFile)
+    if bestIndex != 0:
+        #Deal with the following files only if the executable was compiled 
+        #with some heuristics
+        
+        #  .cfg file
+        bestCfg = os.path.join(bestSubDir, basename+".cfg")
+        finalCfg = finalBin + ".cfg"
+        shutil.move(bestCfg, finalCfg)
+        #  input heuristic file
+        bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
+        finalHeurFile = finalBin+".heur"
+        shutil.move(bestHeurFile, finalHeurFile)
 
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:
-      shutil.rmtree(basesubdir)
+      shutil.rmtree(basesubdir, ignore_errors=True)
 
 
 

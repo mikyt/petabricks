@@ -356,6 +356,7 @@ def main():
   print "Results written to " + options.resultfile
 
   hgdatagen.close()
+  compiler.close()
 
 if __name__ == "__main__":
     main()

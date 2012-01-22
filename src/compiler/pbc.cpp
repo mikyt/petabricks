@@ -436,6 +436,7 @@ int main( int argc, const char ** argv){
   // dump .info file:
   std::ofstream infofile(theOutputInfo.c_str());
   o.cg().addHeuristics(HeuristicManager::instance().usedHeuristics());
+  o.cg().addAllHeuristicFeatures(HeuristicManager::instance().usedHeuristics());
   o.cg().dumpTo(infofile);
   infofile.flush();
   infofile.close();
