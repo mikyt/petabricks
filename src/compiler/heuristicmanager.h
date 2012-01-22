@@ -55,24 +55,26 @@ class HeuristicManager {
   HeuristicPtr& getHeuristic(const std::string name);
   
   void setMin(const std::string heuristicName, const double min) { 
-                                        getHeuristic(heuristicName)->setMin(min); 
-                                      }
+                              internal_getHeuristic(heuristicName)->setMin(min); 
+                            }
               
   void setMax(const std::string heuristicName, const double max) {
-                                        getHeuristic(heuristicName)->setMax(max);
-                                      }
+                              internal_getHeuristic(heuristicName)->setMax(max);
+                            }
   
-  const HeuristicMap& usedHeuristics() const { return _heuristicCache; }
+  const HeuristicMap& usedHeuristics() const { return _usedHeuristics; }
   void useDefaultHeuristics(const bool useDefaultHeuristics) {
     _useDefaultHeuristics = useDefaultHeuristics;
   }
   
 private: 
-  
+  HeuristicPtr& internal_getDefaultHeuristic(const std::string name);
+  HeuristicPtr& internal_getHeuristic(const std::string name);
   
 private:
   HeuristicMap _heuristicCache;
   HeuristicMap _defaultHeuristics;
+  HeuristicMap _usedHeuristics;
   HeuristicMap _fromFile;
   DBManager _db;
   bool _useDefaultHeuristics;

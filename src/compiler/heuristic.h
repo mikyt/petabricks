@@ -67,6 +67,9 @@ public:
   
   double getMin() { return _min; }
   double getMax() { return _max; }
+  
+  std::set<std::string>& getFeatureSet() { return _features; }
+  
 private:
   /** Eval the heuristic using the given features. Return the exact result,
    * not limited by _max and _min */
@@ -75,6 +78,8 @@ private:
   void setMin(const double min) { _min = min; }
   void setMax(const double max) { _max = max; }
   
+  void recordAvailableFeatures(const ValueMap featureValues);
+  
 private:
   FormulaPtr _formula;
   double _min;
@@ -82,6 +87,7 @@ private:
   unsigned int _uses;
   unsigned int _tooLow;
   unsigned int _tooHigh;
+  std::set<std::string> _features;
 };
 
 

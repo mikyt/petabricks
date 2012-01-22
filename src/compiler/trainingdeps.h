@@ -112,6 +112,34 @@ public:
     _callgraph[caller].push_back(callee);
   }
 
+  
+  void addHeuristicFeatures(const std::string heuristicName, 
+                            const HeuristicPtr& heuristic) {
+    
+    _os << "  <availablefeatures heuristic_name=\"" 
+        << jalib::escapeXML(heuristicName) << "\">\n";
+    std::set<std::string>& featureSet = heuristic->getFeatureSet();
+    for(std::set<std::string>::const_iterator i=featureSet.begin(),
+                                              e=featureSet.end();
+        i != e;
+        ++i) {
+      std::string featureName = *i;
+      _os << "    <feature name=\"" << featureName << "\" />\n";
+    }
+    
+    _os << "  </availablefeatures>\n";
+  }
+  
+  void addAllHeuristicFeatures(const HeuristicMap& heuristics) {
+    for(HeuristicMap::const_iterator i=heuristics.begin(), e=heuristics.end();
+        i != e;
+        ++i) {
+      const std::string name = i->first;
+      const HeuristicPtr& heuristic = i->second;
+      addHeuristicFeatures(name, heuristic);
+    }
+  }
+
   void addHeuristics(const HeuristicMap& heuristics) {
     for(HeuristicMap::const_iterator i=heuristics.begin(), e=heuristics.end();
         i != e;

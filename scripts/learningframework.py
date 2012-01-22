@@ -7,6 +7,7 @@ import copy
 import pprint
 import logging
 import mincemeat
+import formula
 from xml.sax.saxutils import escape
 
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 #---------------- Config ------------------
-CONF_MIN_TRIAL_NUMBER = 6
+CONF_MIN_TRIAL_NUMBER = 8
 CONF_EXPLORATION_PROBABILITY = 0.7
 CONF_PICK_BEST_N = 5
 #------------------------------------------
@@ -101,8 +102,11 @@ class SuccessfulCandidate(Candidate):
 
 
 class NeededHeuristic(object):
-    def __init__(self, name, min_val=None, max_val=None):
+    def __init__(self, name, available_features, min_val=None, max_val=None):
+        assert name is not None
+        assert available_features is not None
         self.name = name
+        self.available_features = available_features
         
         if min_val is None:
             self._min_val = float("-inf")
@@ -162,9 +166,9 @@ class Heuristic(object):
     else:
         self._max = float(max_val)
 
-    
+     
   def __repr__(self):
-    formula = escape(self._formula)
+    formula = escape(str(self._formula))
     usesPart = self._buildStringPart("uses", self._uses)
     tooLowPart = self._buildStringPart("tooLow", self._tooLow)
     tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
@@ -172,12 +176,12 @@ class Heuristic(object):
     if self._min == float("-inf"):
         min_part = ""
     else:
-        min_part = " min=%s" % self._min
+        min_part = " min=\"%s\" " % self._min
         
     if self._max == float("inf"):
         max_part = ""
     else:
-        max_part = " max=%s" % self._max
+        max_part = " max=\"%s\" " % self._max
     
     name=self._name
     
@@ -188,7 +192,28 @@ class Heuristic(object):
                                                                    tooHighPart,
                                                                    min_part,
                                                                    max_part)
-
+  
+  def __eq__(self, other):
+      if self._name != other._name:
+          return False
+          
+      if repr(self._formula) != repr(other._formula):
+          return False
+          
+      #TODO: is there any need to actually check all the other fields?
+      
+      return True
+      
+      
+  def __ne__(self, other):
+      return not __eq__(other)
+      
+  @staticmethod
+  def generate(name, available_features, min_val, max_val):
+      newformula = formula.generate(available_features, min_val, max_val)
+      return Heuristic(name, str(newformula), min_val=min_val, max_val=max_val)
+  
+  
   def _buildStringPart(self, varName, variable):
     if variable is not None:
       return ' %s="%s"' % (varName, variable)
@@ -224,20 +249,44 @@ class Heuristic(object):
   def max_val(self):
       return self._max
 
-  def evolve(self):
+  def evolve(self, available_features):
     formulaObj = maximaparser.parse(self._formula)
+    formulaObj.set_available_features(available_features)
     formulaObj.evolve(self._min, self._max)
     self._formula=str(formulaObj)
 
-  def derive_needed_heuristic(self):
+  def derive_needed_heuristic(self, available_features):
       """Return a NeededHeuristic object corresponding to the current heuristic.
 
 The returned object will have the name, min and max fields set to the same 
 values as the heuristic object it is invoked upon.
 Everything else will be None"""
-      return NeededHeuristic(self._name, min_val=self._min, max_val=self._max)
+      return NeededHeuristic(self._name, available_features, min_val=self._min, max_val=self._max)
+      
+  
 
 
+
+class AvailableFeatures(dict):
+    def importFromXmlDOM(self, xmlDOM):
+        for heuristic_dom in xmlDOM.getElementsByTagName("availablefeatures"):
+            heuristic_name = heuristic_dom.getAttribute("heuristic_name")
+            feature_list = self._import_feature_names(heuristic_dom)
+            self[heuristic_name] = feature_list
+
+    def importFromXml(self, xmlFileName):
+        self.importFromXmlDOM(xml.dom.minidom.parse(xmlFileName))
+
+
+    def _import_feature_names(self, heuristic_dom):
+        feature_list = []
+        for feature in heuristic_dom.getElementsByTagName("feature"):
+            feature_name = feature.getAttribute("name")
+            feature_list.append(feature_name)
+        return feature_list
+
+        
+	
 class HeuristicSet(dict):
   """Represents a set of heuristics"""
   def __setitem__(self, key, value):
@@ -295,49 +344,50 @@ heuristics in the database  """
       logger.debug("Heuristic %s is missing", missing_heur)
       bestN = db.getBestNHeuristics(missing_heur.name, N)
       if len(bestN) == 0:
-        #No such heuristic in the DB. Do not complete the set
-        #This is not a problem. It's probably a new heuristic:
-        #just ignore it and it will fall back on the default implemented
-        #into the compiler
-        logger.debug("Not in the DB. Fall back on default")
-        logger.debug("----------------------")
-        continue
-      formula = random.choice(bestN)
-      heur = missing_heur.derive_heuristic(formula)
+          #No such heuristic in the DB. Do not complete the set
+          #This is not a problem. It's probably a new heuristic:
+          #just ignore it and it will fall back on the default implemented
+          #into the compiler
+          logger.debug("Not in the DB. Generate random heuristic:")
+          heur = Heuristic.generate(missing_heur.name, 
+                                    missing_heur.available_features, 
+                                    missing_heur.min_val, 
+                                    missing_heur.max_val)
+          logger.debug(str(heur))
+      else:  
+          formula = random.choice(bestN)
+          heur = missing_heur.derive_heuristic(formula)
       
-      if random.random() < CONF_EXPLORATION_PROBABILITY:
-        #Generate a new formula by modifying the existing one        
-        heur.evolve()
-        logger.debug("EVOLUTION!\nFrom: %s\nTo: %s", formula, heur.formula)
-      else:
-        logger.debug("No evolution for: %s", formula)
+          if random.random() < CONF_EXPLORATION_PROBABILITY:
+              #Generate a new formula by modifying the existing one        
+              heur.evolve(missing_heur.available_features)
+              logger.debug("Evolution\nFrom: %s\nTo: %s", formula, heur.formula)
+          else:
+              logger.debug("No evolution for: %s", formula)
+            
       logger.debug("----------------------")
       self[heur.name] = heur
       
 
-  def forceEvolution(self):
+  def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
-    heuristic.evolve()
+    assert len(all_available_features[name])  > 0
+    heuristic.evolve(all_available_features[name])
 
 
-  def ensureUnique(self, hSetCollection):
+  def ensureUnique(self, hSetCollection, all_available_features):
     """Ensure that the current heuristic set is unique with respect to those in
 the given collection.
 
 If an identical heuristic set is found in the collection, the current one
 is evolved until it becomes different and unique"""
-    if len(self) == 0:
-      #Empty heuristic set: always consider it as unique
-      #TODO: remove this when it will be possible to generate euristics
-      #from scratch
-      return
-
+    
     while self in hSetCollection:
         #Prevent having two identical sets of heuristics
         logger.info("hSet is equal to one already in the collection. Evolve it")
         pp = pprint.PrettyPrinter()
         logger.debug("Old: %s", pp.pformat(self))
-        self.forceEvolution()
+        self.forceEvolution(all_available_features)
         logger.debug("New (evolved): %s", pp.pformat(self))
 
 
@@ -450,9 +500,11 @@ class Learner(object):
   _candidateSortingKey = None
   _tearDown = None
   
-  def _getNeededHeuristics(self, _):
+  def _getNeededHeuristics(self, unused_benchmark):
     return []
-    
+   
+  def _get_available_features(self, unused_benchmark, unused_heuristic_name):
+      return []
   
   def __init__(self, heuristicSetFileName = None, use_mapreduce = False):
     self._heuristicManager = HeuristicManager(heuristicSetFileName)
@@ -538,9 +590,6 @@ getting the current best heuristics, without modifying them"""
               
       datasource = dict(enumerate(jobs))
       
-      pp = pprint.PrettyPrinter()
-      pp.pprint(datasource)
-      
       print "Waiting for mincemeat.py MapReduce workers"
       results = self._server.process_datasource(datasource)
 
@@ -553,19 +602,15 @@ getting the current best heuristics, without modifying them"""
 result inside the candidates list taken from the additional parameters"""
       candidates = additionalParameters["candidates"]
       
-      #self._testHSet is just a pointer to a function, but since it's inside 
-      #an object python understand it to be a method.
-      #Let's get back the function using im_func
-      testfn = self._testHSet.im_func
+      testfn = self._testHSet
           
       count = 0
       for hSet in allHSets:
-          count = count + 1
-          
           currentCandidate = testfn(benchmark, count, hSet, 
                                     additionalParameters)
           currentCandidate.originalIndex = count
           candidates.append(currentCandidate)
+          count = count + 1
       
   def _generateAndTestHSets(self, benchmark, additionalParameters):
     neededHeuristics = additionalParameters["neededHeuristics"]
@@ -587,7 +632,7 @@ result inside the candidates list taken from the additional parameters"""
       hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
 
       previousHSets = allHSets[:count]
-      hSet.ensureUnique(previousHSets)
+      hSet.ensureUnique(previousHSets, self._get_available_features(benchmark))
 
       count = count + 1
 
@@ -617,20 +662,23 @@ result inside the candidates list taken from the additional parameters"""
 
     canLearn = (len(neededHeuristics) > 0)
     if canLearn:
-      self._generateAndTestHSets(benchmark, additionalParameters)
+        self._generateAndTestHSets(benchmark, additionalParameters)
 
-    candidates.sort()
+        candidates.sort()
 
-    if candidates[0].failed:
-        raise AllCandidatesCrashError
+        if candidates[0].failed:
+            raise AllCandidatesCrashError
 
-    if canLearn and learn:
-        logger.info("Storing learning results in the DB")
-        self.storeCandidatesDataInDB(candidates)
-
+        if learn:
+            logger.info("Storing learning results in the DB")
+            self.storeCandidatesDataInDB(candidates)
+    else:
+        logger.info("Nothing to learn: no heuristic is needed")
 
     if self._tearDown is not None:
-      self._tearDown(benchmark, additionalParameters)
+        self._tearDown(benchmark, additionalParameters)
 
     return 0
 
+  def close(self):
+      self._server.close()
