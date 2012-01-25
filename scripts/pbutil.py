@@ -83,7 +83,7 @@ def parallelRunJobs(jobs, nParallelJobs=None):
         #child
         progress.disable()
         self.fd.close()
-        class Redir():
+        class Redir:
           def __init__(self, fd):
             self.fd=fd
           def write(self, s):
