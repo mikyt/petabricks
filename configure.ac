@@ -109,8 +109,18 @@ AC_CHECK_HEADERS([sqlite3.h],      [], [AC_MSG_ERROR([failed to find sqlite3.h h
 
 AC_SEARCH_LIBS([MD5_Init], [crypto ssl], [], [AC_MSG_ERROR([missing package libssl-dev])])
 
+#Some blas implementations require atlas to be loaded.
+#In turn, altas might require some other libraries
+#The following code loads all of them, if they are available
+AC_CHECK_LIB([gfortran],   [_gfortran_st_write], [], [])
+AC_CHECK_LIB([f77blas],    [lsame_],	   [], [])
+AC_CHECK_LIB([atlas],      [ATL_dgemm],    [], [])
 AC_CHECK_LIB([cblas],      [cblas_dgemm],    [], [])
-AC_CHECK_LIB([blas],       [cblas_dgemm],    [], [AC_MSG_WARN([failed to find -lblas, some benchmarks may not work])])
+AC_CHECK_LIB([blas],       [cblas_dgemm],    [], [])
+if test ! \( "$ac_cv_lib_cblas_cblas_dgemm" = "yes" -o "$ac_cv_lib_blas_cblas_dgemm" = "yes" \); then
+	AC_MSG_WARN([failed to find either -lblas or -lcblas, some benchmarks may not work])
+fi
+
 AC_CHECK_LIB([fftw3],      [fftw_malloc],    [], [AC_MSG_WARN([failed to find -lfftw3, some benchmarks may not work])])
 AC_CHECK_LIB([lapack],     [dposv_],         [], [AC_MSG_WARN([failed to find -llapack, some benchmarks may not work])])
 AC_CHECK_LIB([m],          [cos],            [], [AC_MSG_WARN([failed to find -lm, some benchmarks may not work])])
