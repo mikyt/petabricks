@@ -57,7 +57,9 @@
 #endif
 
 #ifdef HAVE_CBLAS_H
+extern "C" {
 # include <cblas.h>
+}	
 #endif
 
 //these must be declared in the user code
