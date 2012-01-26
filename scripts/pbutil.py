@@ -63,7 +63,6 @@ def setmemlimit(n = getmemorysize()):
 
 
 def parallelRunJobs(jobs, nParallelJobs=None):
-  outFile=open("/tmp/parallelRunJobs.txt", "w")
   class JobInfo:
     def __init__(self, id, fn):
       self.id=id
@@ -88,8 +87,6 @@ def parallelRunJobs(jobs, nParallelJobs=None):
             self.fd=fd
           def write(self, s):
             self.fd.sendall(s)
-            outFile.write(s)
-            outFile.flush()
         sys.stdout = Redir(w)
         #sys.stderr = sys.stdout
         try:
