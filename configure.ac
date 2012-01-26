@@ -109,12 +109,15 @@ AC_CHECK_HEADERS([sqlite3.h],      [], [AC_MSG_ERROR([failed to find sqlite3.h h
 
 AC_SEARCH_LIBS([MD5_Init], [crypto ssl], [], [AC_MSG_ERROR([missing package libssl-dev])])
 
+AC_CHECK_LIB([pthread],    [pthread_create], [], [AC_MSG_WARN([failed to find -lpthread, some benchmarks may not work])])
+
 #Some blas implementations require atlas to be loaded.
 #In turn, altas might require some other libraries
 #The following code loads all of them, if they are available
 AC_CHECK_LIB([gfortran],   [_gfortran_st_write], [], [])
 AC_CHECK_LIB([f77blas],    [lsame_],	   [], [])
 AC_CHECK_LIB([atlas],      [ATL_dgemm],    [], [])
+AC_CHECK_LIB([ptf77blas],  [ATL_dpttrsm],	   [], [])
 AC_CHECK_LIB([cblas],      [cblas_dgemm],    [], [])
 AC_CHECK_LIB([blas],       [cblas_dgemm],    [], [])
 if test ! \( "$ac_cv_lib_cblas_cblas_dgemm" = "yes" -o "$ac_cv_lib_blas_cblas_dgemm" = "yes" \); then
@@ -124,7 +127,6 @@ fi
 AC_CHECK_LIB([fftw3],      [fftw_malloc],    [], [AC_MSG_WARN([failed to find -lfftw3, some benchmarks may not work])])
 AC_CHECK_LIB([lapack],     [dposv_],         [], [AC_MSG_WARN([failed to find -llapack, some benchmarks may not work])])
 AC_CHECK_LIB([m],          [cos],            [], [AC_MSG_WARN([failed to find -lm, some benchmarks may not work])])
-AC_CHECK_LIB([pthread],    [pthread_create], [], [AC_MSG_WARN([failed to find -lpthread, some benchmarks may not work])])
 AC_CHECK_LIB([rt],         [clock_gettime],  [],
                         [AC_DEFINE([USE_GETTIMEOFDAY],[],[define if clock_gettime() doesnt work])])
 AC_CHECK_LIB([sqlite3],	   [sqlite3_open],   [], [AC_MSG_ERROR([failed to find -lsqlite, unable to compile the long term learning for heuristics])])
