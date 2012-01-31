@@ -40,7 +40,7 @@ following attributes:
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]
     pbc_exe = additionalParameters["pbc_exe"]
-    jobs = additionalParameters["num_compilation_jobs"]
+    threads = additionalParameters["threads"]
     max_tuning_size = additionalParameters["max_tuning_size"]
     max_tuning_time = additionalParameters["max_tuning_time"]
     dirnumber = count + 1
@@ -60,7 +60,7 @@ following attributes:
                                      benchmark,
                                      binary = binary,
                                      heuristics = heuristicsFile,
-                                     jobs = jobs,
+                                     jobs = threads,
                                      timeout = CONF_TIMEOUT)
     if status != 0:
       #Compilation has failed!
@@ -78,7 +78,7 @@ following attributes:
     #Autotune
     try:
       sgatuner.autotune_withparams(binary, candidates, n=max_tuning_size, 
-                                   max_time=max_tuning_time)
+                                   max_time=max_tuning_time, threads=threads)
 
       #Candidate has not failed: mark as such
       tunedCandidate = candidates[-1]
@@ -108,13 +108,13 @@ following attributes:
 class LearningCompiler(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
-  def __init__(self, pbcExe, heuristicSetFileName = None, jobs = None, n=None, 
+  def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
                maxTuningTime=CONF_MAX_TIME):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
                                            use_mapreduce=True)
     
     self._pbcExe = pbcExe
-    self._jobs = jobs
+    self._threads = threads
     self._n = n
     self._maxTuningTime = maxTuningTime
 
@@ -161,7 +161,7 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["basename"] = basename
     additionalParameters["path"] = path
     additionalParameters["pbc_exe"] = self._pbcExe
-    additionalParameters["num_compilation_jobs"] = self._jobs
+    additionalParameters["threads"] = self._threads
     additionalParameters["max_tuning_size"] = self._n
     additionalParameters["max_tuning_time"] = self._maxTuningTime
 
@@ -174,7 +174,7 @@ class LearningCompiler(learningframework.Learner):
     status = pbutil_support.compileBenchmark(self._pbcExe,
                                              benchmark,
                                              binary = binary,
-                                             jobs = self._jobs,
+                                             jobs = self._threads,
                                              defaultHeuristics = True)
     if status != 0:
       logger.error("Compile FAILED with default heuristics - "

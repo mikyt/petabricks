@@ -206,7 +206,7 @@ class Heuristic(object):
       
       
   def __ne__(self, other):
-      return not __eq__(other)
+      return not self.__eq__(other)
       
   @staticmethod
   def generate(name, available_features, min_val, max_val):
@@ -503,7 +503,8 @@ class Learner(object):
   def _getNeededHeuristics(self, unused_benchmark):
     return []
    
-  def _get_available_features(self, unused_benchmark, unused_heuristic_name):
+  def _get_available_features(self, unused_benchmark,
+                              unused_heuristic_name=None):
       return []
   
   def __init__(self, heuristicSetFileName = None, use_mapreduce = False):

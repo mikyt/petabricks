@@ -83,7 +83,10 @@ def parseCmdline(petabricks_path):
 		type="int",
 		help="maximum time (in seconds) to be spent tuning a candidate",
 		default=None)
-
+  parser.add_option("--threads",
+                type="int",
+                help="maximum number of threads to be used for each test",
+                default=None)
   return parser.parse_args()
 
 
@@ -298,7 +301,8 @@ def main():
   compiler = learningcompiler.LearningCompiler(pbc,
                                       heuristicSetFileName = options.heuristics,
                                       n=options.maxtuningsize,
-                                      maxTuningTime=options.maxtuningtime)
+                                      maxTuningTime=options.maxtuningtime,
+                                      threads = options.threads)
   tester = TestRunner(compiler, options.maxtestsize, options.maxtesttime)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
 
