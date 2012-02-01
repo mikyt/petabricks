@@ -110,8 +110,6 @@ class HeuristicDB:
       
     for name, heuristic in hSet.iteritems():
       if weightedScore:
-	outofbounds = heuristic.tooHigh + heuristic.tooLow
-	uses = heuristic.uses 
 	score = self._computeScore(heuristic, points)
       else:
 	score = points
@@ -169,6 +167,19 @@ class HeuristicDB:
     cur.close()
     return result
   
+  def getNMostFrequentHeuristics(self, name, N, threshold=0.75):
+      cur = self.__db.cursor()
+      query = ("SELECT formula FROM Heuristic"
+               " JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID"
+               " WHERE HeuristicKind.name=?"
+               "  AND Heuristic.score/Heuristic.useCount > ?"
+               " ORDER BY Heuristic.useCount DESC,"
+               "  Heuristic.score/Heuristic.useCount DESC"
+               " LIMIT ?")
+      cur.execute(query, (name, threshold, N))
+      result = [row[0] for row in cur.fetchall()]
+      cur.close()
+      return result
   
   def getHeuristicsFinalScoreByKind(self, kind, bestN=None):
     """Return a dictionary {formula : finalScore}, 
