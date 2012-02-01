@@ -546,10 +546,12 @@ The candidates should already be ordered (from the best to the worst)"""
 
       count = count +1
 
-  def _generateHSetsByElitism(self, allHSets, neededHeuristics, eliteSize):
+  def _generateHSetsByElitism(self, neededHeuristics, eliteSize, 
+                              get_n_heuristics):
     """Generate "eliteSize" heuristic sets by elitism, that is by
 getting the current best heuristics, without modifying them"""
 
+    allHSets = []
     #Get the best N heuristics of each kind
     #TODO: use information about the best heuristic sets!!!
     heuristicLists = {}
@@ -557,7 +559,7 @@ getting the current best heuristics, without modifying them"""
         kind = heur.name
         heuristicLists[kind] = [heur.derive_heuristic(formula)
                                 for formula 
-                                in self._db.getBestNHeuristics(kind, eliteSize)]
+                                in get_n_heuristics(kind, eliteSize)]
 
     #Build the sets
     try:
@@ -569,7 +571,7 @@ getting the current best heuristics, without modifying them"""
               newSet[kind] = heuristicLists[kind][i]
 
 	allHSets.append(newSet)
-	logger.debug("ELITE: %s", newSet)
+	logger.debug("ELITE(%s): %s", get_n_heuristics.__name__, newSet)
 
     except IndexError:
       #One of the lists is too small: stop here
@@ -617,7 +619,12 @@ result inside the candidates list taken from the additional parameters"""
 
     allHSets = []
 
-    self._generateHSetsByElitism(allHSets, neededHeuristics, 1)
+    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+                                         self._db.getBestNHeuristics)
+    allHSets.extend(elite)
+    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+                                         self._db.getNMostFrequentHeuristics)
+    allHSets.extend(elite)
     numGenerated = len(allHSets)
 
     #Generate the ramaining needed (empty) heuristicSets
