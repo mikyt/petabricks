@@ -125,7 +125,10 @@ class StorageDirsTemplate:
       
   def clearInputs(self):
     for f in os.listdir(self.inputd):
-      os.unlink(os.path.join(self.inputd, f))
+      try:
+        os.unlink(os.path.join(self.inputd, f))
+      except OSError:
+        pass
 
   def openCsvStats(self, name, headerRow):
     w=csv.writer(open(os.path.join(self.statsd, name + ".csv"), "w"), dialect=dialect)

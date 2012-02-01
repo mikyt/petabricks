@@ -528,7 +528,10 @@ class Candidate:
     for f in ('config', 'stats', 'stats_raw'):
       f=os.path.join(self.outputdir,f)
       if os.path.isfile(f):
-        os.unlink(f)
+        try:  
+          os.unlink(f)
+        except OSError:
+          pass
     os.rmdir(self.outputdir)
   
   def timingResults(self, n=None):
