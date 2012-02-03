@@ -34,9 +34,9 @@
 //#include "common/jassert.h"
 
 #include "maximawrapper.h"
+#include "featurecomputer.h"
 
 namespace petabricks {
-typedef std::map<std::string, double> ValueMap;
 
 class Heuristic : public jalib::JRefCounted {
   friend class HeuristicManager;
