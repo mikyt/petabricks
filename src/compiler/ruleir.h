@@ -119,6 +119,7 @@ public:
   RIRNode(Type t) : _type(t) {}
   Type type() const { return _type; }
   const char* typeStr() const;
+  static const char* typeStr(const Type t);
   virtual std::string debugStr() const;
   bool isExpr()  const { return (_type&EXPR)  != 0; }
   bool isStmt()  const { return (_type&STMT)  != 0; }
