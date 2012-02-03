@@ -532,7 +532,10 @@ class Candidate:
           os.unlink(f)
         except OSError:
           pass
-    os.rmdir(self.outputdir)
+    try:
+      os.rmdir(self.outputdir)
+    except OSError:
+      pass
   
   def timingResults(self, n=None):
     if n is None:
