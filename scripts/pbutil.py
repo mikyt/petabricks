@@ -293,7 +293,8 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None):
     jobs_per_pbc = cpuCount()
   else:
     jobs_per_pbc=max(1, 2*cpuCount() / len(benchmarks))
-  compiler = learningcompiler.LearningCompiler(pbc, heuristicSetFileName, jobs=jobs_per_pbc)
+  compiler = learningcompiler.LearningCompiler(pbc, heuristicSetFileName,
+                                               threads=jobs_per_pbc)
 
   def innerCompileBenchmark(name):
     print name.ljust(benchmarkMaxLen)
