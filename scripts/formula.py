@@ -7,18 +7,34 @@ _randomMIN = -100
 _randomMAX = 100
 _mutationProbability = 0.3
 
+#Exception types
 class Error(Exception):
     """Base class for all the exceptions of this module"""
     pass
 
-
 class NoElementException(Error):
     pass    
-
 
 class NoFeatureAvailable(Error):
     pass
 
+class WrongResultTypeError(Error):
+    pass
+
+class ResultType(object):
+    pass
+
+#Formula types
+class IntegerResult(ResultType):
+    pass
+
+class BooleanResult(ResultType):
+    pass
+
+class FloatResult(ResultType):
+    pass
+
+#Functions
 def random_roulette_selection(weighted_candidates):
     """Perform roulette selection between the given candidates.
 weighted_candidates is a list of pairs (weight, candidate).
@@ -79,10 +95,13 @@ def selectDifferentElement(element, theList):
     
   return newElement
 
-
 def isImmediateNumber(formula):
-  return isinstance(formula, FormulaInteger) or \
-         isinstance(formula, FormulaFloat)
+    return (isinstance(formula, FormulaInteger) or
+            isinstance(formula, FormulaFloat))
+
+def isImmediate(formula):
+    return (isinstance(formula, FormulaBool) or
+            isImmediateNumber(formula))
 
 def outside_limits(value, min_val, max_val):
     if value < min_val or value > max_val:
@@ -104,24 +123,47 @@ the coefficient will be strictly positive (respectively negative)"""
     return random.uniform(-1, 1)
     
 
-def generate(available_features, min_val=float("-inf"), max_val=float("inf")):
+def _specifictype(resulttype):
+    if resulttype == BooleanResult:
+        return FormulaBool
+    elif resulttype == IntegerResult:
+        return FormulaInteger
+    elif resulttype == FloatResult:
+        return FormulaFloat
+    raise WrongResultTypeError
+
+def depythonize_str(formula_str):
+    """Return the costant folded (=evaluated) representation of the formula"""
+    if formula_str == "True":
+        return "true"
+    elif formula_str == "False":
+        return "false"
+    else:
+        return formula_str
+        
+def pythonize_str(formula_str):
+    if formula_str == "true":
+        return "True"
+    elif formula_str == "false":
+        return "False"
+    else:
+        return formula_str
+        
+        
+def generate(available_features, resulttype, min_val=float("-inf"), max_val=float("inf")):
     """Generates a completely random formula, acknowledging the limits,
 if given"""
 
     formula_types = [(3.5, FormulaVariable), 
-                     (3.5, FormulaInteger),
+                     (3.5, _specifictype(resulttype)),
                      (2, FormulaBinop),
                      (1, FormulaIf)]
-                     
-    #TODO FormulaBool and FormulaFloat are not in formula_types, because in
-    #order to be used a way to specify the type of the formula should be 
-    #available
-    Formula = random_roulette_selection(formula_types) 
-    generatedformula = Formula.generate(available_features, min_val, max_val)
-    return FormulaContainer(generatedformula)
-
-
     
+    Formula = random_roulette_selection(formula_types) 
+    generatedformula = Formula.generate(available_features, resulttype, min_val, max_val)
+    return FormulaContainer(generatedformula)
+        
+
 class FormulaContainer:
     """This wrapper class allows to completely mutate formulas through 
 generation of new formulas or subformulas.
@@ -134,14 +176,17 @@ is performed by the "mutate" method of the construct itself."""
         self._formulaobj = formulaobj
         
     def __repr__(self):
-        return repr(self._formulaobj)
+        return str(self._formulaobj)
         
     def evolve(self, min_val=float("-inf"), max_val=float("inf")):
         if random.random() < _mutationProbability:
             #Generate a completely new formula
             available_features = self.get_available_features()
-            self._formulaobj = generate(available_features, min_val, max_val)
-            return 
+            self._formulaobj = generate(available_features, 
+                                        self._formulaobj.resulttype,
+                                        min_val, 
+                                        max_val)
+            return True
         return self._formulaobj.evolve(min_val, max_val)
         
     def set_available_features(self, available_features):
@@ -151,6 +196,14 @@ is performed by the "mutate" method of the construct itself."""
     def get_available_features(self):
       return self._formulaobj.get_available_features()
       
+    def _set_resulttype(self, resulttype):
+        self._formulaobj.resulttype = resulttype
+        
+    def _get_resulttype(self):
+        return self._formulaobj.resulttype
+        
+    resulttype = property(_get_resulttype, _set_resulttype)
+    
     #The generate method need not be implemented: 
     #this is just a wrapper class!
     
@@ -158,9 +211,10 @@ is performed by the "mutate" method of the construct itself."""
         
 
 class FormulaVariable:
-  def __init__(self, ident):
+  def __init__(self, ident, resulttype=IntegerResult):
     self.ident=ident
     self._available_features = None
+    self.resulttype = resulttype
     
   def __repr__(self):
     return self.ident
@@ -176,13 +230,15 @@ class FormulaVariable:
       return self._available_features
       
   @staticmethod
-  def generate(available_features, unused_min_val=None, unused_max_val=None):
+  def generate(available_features, resulttype, unused_min_val=None, 
+               unused_max_val=None):
       if not available_features:
           raise NoFeatureAvailable
       
       name = random.choice(available_features)
       newformula = FormulaVariable(name)
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula
       
   
@@ -190,6 +246,7 @@ class FormulaInteger:
   def __init__(self, value):
     self.value=value
     self._available_features = None
+    self.resulttype = IntegerResult
     
   def __repr__(self):
     return str(self.value)
@@ -237,10 +294,14 @@ class FormulaInteger:
       return self._available_features
       
   @staticmethod
-  def generate(available_features, min_val, max_val):
+  def generate(available_features, resulttype, min_val, max_val):
+      if resulttype != IntegerResult:
+          raise WrongResultTypeError
+      
       newformula = FormulaInteger(0)
       newformula.mutateValue(min_val, max_val)
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula
        
 
@@ -248,6 +309,7 @@ class FormulaBool:
   def __init__(self, value):
     self.value=value
     self._available_features = None
+    self.resulttype = BooleanResult
     
   def __repr__(self):
     if self.value:
@@ -269,10 +331,14 @@ class FormulaBool:
       return self._available_features
       
   @staticmethod
-  def generate(available_features, unused_min_val=None, unused_max_val=None):
+  def generate(available_features, resulttype, unused_min_val=None, unused_max_val=None):
+      if resulttype != BooleanResult:
+          raise WrongResultTypeError
+      
       newformula = FormulaBool(True)
       newformula.evolve()
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula
       
       
@@ -280,6 +346,7 @@ class FormulaFloat:
   def __init__(self, value):
     self.value=value
     self._available_features = None
+    self.resulttype = FloatResult
     
   def __repr__(self):
     return str(self.value)
@@ -327,10 +394,14 @@ class FormulaFloat:
       return self._available_features
       
   @staticmethod
-  def generate(available_features, min_val, max_val):
+  def generate(available_features, resulttype, min_val, max_val):
+      if resulttype != FloatResult:
+          raise WrongResultTypeError
+      
       newformula = FormulaFloat(0)
       newformula.mutateValue(min_val, max_val)
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula
  
   
@@ -351,20 +422,33 @@ class FormulaBinop:
     self.left=left
     self.right=right
     self._available_features = None
+    if (op in self.comparison_operators) or (op in self.binary_logic_operators):
+        self.resulttype = BooleanResult
+    else:
+        #Arithmetic operator
+        if left.resulttype == FloatResult or right.resulttype == FloatResult:
+            self.resulttype = FloatResult
+        else:
+            self.resulttype = IntegerResult
     
   def __repr__(self):
-    reprStr = "("+ str(self.left) +" "+ str(self.op) + " " + str(self.right)+")"
-    if not (isImmediateNumber(self.left) and isImmediateNumber(self.right)):
+    if not (isImmediate(self.left) and isImmediate(self.right)):
       #Return extended representation
+      reprStr = "("+ str(self.left) +" "+ str(self.op) + " " + str(self.right)+")"
       return reprStr
     else:
       #Constant folding
       #Handle special cases where sintax is different
       op = self._pythonOperator()
-      reprStr = "("+ str(self.left) +" "+ str(op) + " " + str(self.right)+")"
+      left = pythonize_str(str(self.left))
+      right = pythonize_str(str(self.right))
+      reprStr = "("+ left +" "+ str(op) + " " + right +")"
       
-      return str(eval(reprStr))
-  
+      e=eval(reprStr)
+      s=str(e)
+      d=depythonize_str(s)
+      return d
+        
   def _pythonOperator(self):
     """Return the python representation of the operator"""
     if self.op == "=":
@@ -394,7 +478,6 @@ Returns true if the formula was actually mutated, false otherwise"""
     
     return mutated
   
-  
   def evolveOperator(self):
    
     try:
@@ -413,7 +496,8 @@ Returns true if the formula was actually mutated, false otherwise"""
 
     
   def mutate(self, min_val, max_val):
-      newsubformula = generate(self._available_features, min_val, max_val)
+      newsubformula = generate(self._available_features, self.resulttype,
+                               min_val, max_val)
       if random.random() < 0.5:
           self.left = newsubformula
       else:
@@ -453,18 +537,45 @@ operator"""
       return self._available_features
       
   @classmethod
-  def generate(cls, available_features, min_val, max_val):
-      op = random.choice(cls.all_operators)
-      newformula = FormulaBinop(op, 
-                                generate(available_features, 
-                                         min_val, 
-                                         max_val), 
-                                generate(available_features, 
-                                         min_val, 
-                                         max_val))
+  def generate(cls, available_features, resulttype, min_val, max_val):
+      if resulttype == BooleanResult:
+          (op, left, right) = cls._generate_boolean(available_features)
+      else:
+          (op, left, right) = cls._generate_numeric(available_features, 
+                                                    min_val, 
+                                                    max_val)
+          
+      newformula = FormulaBinop(op, left, right)
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula
+  
+  @classmethod
+  def _generate_boolean(cls, available_features):
+      op_class = random.choice([cls.comparison_operators, 
+                                cls.binary_logic_operators])
+      op = random.choice(op_class)
       
+      if op_class == cls.comparison_operators:
+          #Need numeric values to compare
+          #TODO: allow generation of Float results
+          left = generate(available_features, IntegerResult)
+          right = generate(available_features, IntegerResult)
+      else:
+          #Need boolean values
+          left = generate(available_features, BooleanResult)
+          right = generate(available_features, BooleanResult)
+      
+      return (op, left, right)
+      
+      
+  @classmethod
+  def _generate_numeric(cls, available_features, min_val, max_val):
+      op = random.choice(cls.arithmetic_operators)
+      #TODO: allow generation of Float results
+      left = generate(available_features, IntegerResult, min_val, max_val)
+      right = generate(available_features, IntegerResult, min_val, max_val)
+      return (op, left, right)
       
       
 class FormulaIf:
@@ -474,17 +585,48 @@ class FormulaIf:
     self.elseClause = elseClause
     self._available_features = None
     
-  def __repr__(self):
-    if self.elseClause is not None:
-      elsePart=" else " + str(self.elseClause)
+    typeThen = thenClause.resulttype
+    if elseClause:
+        typeElse = elseClause.resulttype
     else:
+        typeElse = None
+        
+    #Get the highest-type result type
+    if typeThen == FloatResult or typeElse == FloatResult:
+        self.resulttype = FloatResult
+    elif typeThen == IntegerResult or typeThen == IntegerResult:
+        self.resulttype = IntegerResult
+    else:
+        self.resulttype = BooleanResult
+    
+        
+    
+  def __repr__(self):
+    #Constant folding
+    if str(self.cond) == "true":
+        return str(self.thenClause)
+    elif str(self.cond) == "false":
+        return str(self.elseClause)
+        
+    thenPart = str(self.thenClause)
+        
+    if self.elseClause is not None:
+      elseRepr = str(self.elseClause)
+      elsePart=" else " + elseRepr
+    else:
+      elseRepr=""
       elsePart=""
       
-    return "if " + str(self.cond) + " then " + str(self.thenClause) + elsePart
+    if thenPart == elseRepr:
+        #Both cases are equal: the if clause is useless
+        return thenPart
+
+    return "if " + str(self.cond) + " then " + thenPart + elsePart
   
   
   def mutate(self, min_val, max_val):
-      newsubformula = generate(self._available_features, min_val, max_val)
+      newsubformula = generate(self._available_features, self.resulttype, 
+                               min_val, max_val)
       choice = random.randrange(3)
       if choice == 0:
           self.cond = newsubformula
@@ -525,15 +667,12 @@ class FormulaIf:
       return self._available_features
       
   @staticmethod
-  def generate(available_features, min_val, max_val):
-      newformula = FormulaIf(generate(available_features, 
-                                      min_val, 
-                                      max_val), 
-                             generate(available_features,
-                                      min_val,
-                                      max_val), 
-                             generate(available_features,
-                                      min_val,
-                                      max_val))
+  def generate(available_features, resulttype, min_val, max_val):
+      condition = generate(available_features, BooleanResult)
+      thenClause = generate(available_features, resulttype, min_val, max_val)
+      elseClause = generate(available_features, resulttype, min_val, max_val)
+      
+      newformula = FormulaIf(condition, thenClause, elseClause)
       newformula.set_available_features(available_features)
+      newformula.resulttype = resulttype
       return newformula

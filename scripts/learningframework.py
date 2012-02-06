@@ -209,8 +209,9 @@ class Heuristic(object):
       return not self.__eq__(other)
       
   @staticmethod
-  def generate(name, available_features, min_val, max_val):
-      newformula = formula.generate(available_features, min_val, max_val)
+  def generate(name, available_features, resulttype, min_val, max_val):
+      newformula = formula.generate(available_features, resulttype, min_val, 
+                                    max_val)
       return Heuristic(name, str(newformula), min_val=min_val, max_val=max_val)
   
   
@@ -350,7 +351,8 @@ heuristics in the database  """
           #into the compiler
           logger.debug("Not in the DB. Generate random heuristic:")
           heur = Heuristic.generate(missing_heur.name, 
-                                    missing_heur.available_features, 
+                                    missing_heur.available_features,
+                                    formula.IntegerResult,
                                     missing_heur.min_val, 
                                     missing_heur.max_val)
           logger.debug(str(heur))
