@@ -12,6 +12,8 @@ import pbutil
 import subprocess
 import heuristicdb
 import logging
+import mylogger
+
 from optparse import OptionParser
 
 CONF_TIMEOUT = 5 * 60
@@ -21,32 +23,6 @@ HEURISTIC_KINDS = ["UserRule_blockNumber",
 MAX_PRINTED_HEURISTICS = 10
 
 logger = logging.getLogger(__name__)
-
-class NonRootFilter:
-    "Allows everything not coming from the root logger itself to be logged"
-    def filter(self, record):
-        """The function implementing the filter"""
-        if record.name == "root":
-            # Don't log
-            return 0
-        return 1
-
-def configureLogging(errorfile):
-    rootLogger = logging.getLogger()
-    rootLogger.setLevel(logging.DEBUG)
-    rootLogger.addFilter(NonRootFilter())
-
-    # create file handler which logs error messages
-    fh = logging.FileHandler(errorfile, mode="w")
-    # create formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - '
-                                  '%(levelname)s - %(message)s')
-    fh.setFormatter(formatter)
-    # create console handler
-    ch = logging.StreamHandler()
-    # add the handlers to logger
-    rootLogger.addHandler(ch)
-    rootLogger.addHandler(fh)
 
 
 def parseCmdline(petabricks_path):
@@ -292,7 +268,7 @@ def main():
     print "No test program specified"
     exit(-1)
 
-  configureLogging(options.errorfile)
+  mylogger.configureLogging(options.errorfile)
 
   testProgram=os.path.abspath(args[0])
   testBinary = os.path.splitext(testProgram)[0]

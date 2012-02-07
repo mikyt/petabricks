@@ -9,9 +9,9 @@ import os
 import pbutil_support
 import tunerwarnings
 import shutil
-import sys
 import sgatuner
 import logging
+import mylogger
 
 #------------------ Config --------------------
 CONF_MAX_TIME = 60  # Seconds
@@ -109,9 +109,9 @@ class LearningCompiler(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
-               maxTuningTime=CONF_MAX_TIME):
+               maxTuningTime=CONF_MAX_TIME, use_mapreduce=True):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
-                                           use_mapreduce=True)
+                                           use_mapreduce=use_mapreduce)
     
     self._pbcExe = pbcExe
     self._threads = threads
@@ -262,12 +262,27 @@ class LearningCompiler(learningframework.Learner):
 
 #TEST
 if __name__ == "__main__":
-  #basedir="/afs/csail.mit.edu/u/m/mtartara/programs/petabricks/"
-  basedir="/home/mikyt/programmi/petabricks/"
-  pbc = basedir+"src/pbc"
-  try:
-    heuristics = sys.argv[2]
-  except:
-    heuristics = None
-  l = LearningCompiler(pbc, heuristicSetFileName = heuristics)
-  l.compileLearningHeuristics(sys.argv[1])
+    import sys
+    
+    script_path = sys.path[0]
+    petabricks_path = os.path.join(script_path, "../")
+    petabricks_path = os.path.normpath(petabricks_path)
+    examples_path= os.path.join(petabricks_path, "examples")  
+    pbc = os.path.join(petabricks_path,"src/pbc")
+    errorfile = pbc + "error-log.dat"
+    
+    mylogger.configureLogging(errorfile)
+    
+    if len(sys.argv)==1:
+        print "Usage: learningcompiler.py program.pbcc [heuristicSetFileName]"
+        sys.exit(1)
+        
+    try:
+        heuristics = sys.argv[2]
+    except:
+        heuristics = None
+        
+    l = LearningCompiler(pbc, 
+                         heuristicSetFileName = heuristics, 
+                         use_mapreduce=False)
+    l.compileProgram(sys.argv[1])
