@@ -676,6 +676,10 @@ result inside the candidates list taken from the additional parameters"""
 
         candidates.sort()
 
+        import pprint
+        pp = pprint.PrettyPrinter()
+        logger.debug(pp.pformat(candidates))
+    
         if candidates[0].failed:
             raise AllCandidatesCrashError
 

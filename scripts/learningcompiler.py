@@ -215,9 +215,6 @@ class LearningCompiler(learningframework.Learner):
     basename = additionalParameters["basename"]
     path = additionalParameters["path"]
 
-    import pprint
-    pp = pprint.PrettyPrinter()
-    logger.debug(pp.pformat(candidates))
     if len(candidates) != 0:
         bestIndex = candidates[0].originalIndex + 1
     else:
