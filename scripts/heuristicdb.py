@@ -160,24 +160,31 @@ class HeuristicDB:
     
     
   def getBestNHeuristics(self, name, N):
-    cur = self.__db.cursor()
-    query = "SELECT formula FROM Heuristic JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID WHERE HeuristicKind.name=? ORDER BY Heuristic.score/Heuristic.useCount DESC LIMIT ?"
-    cur.execute(query, (name, N))
-    result = [row[0] for row in cur.fetchall()]
-    cur.close()
-    return result
+      """Returns (finalScore, heuristic) pairs, ordered by finalScore"""
+      cur = self.__db.cursor()
+      query = ("SELECT score/useCount AS finalScore, formula"
+              " FROM Heuristic JOIN HeuristicKind"
+              " ON Heuristic.kindID=HeuristicKind.ID"
+              " WHERE HeuristicKind.name=?"
+              " ORDER BY finalScore DESC LIMIT ?")
+      cur.execute(query, (name, N))
+      result = [(row[0], row[1]) for row in cur.fetchall()]
+      cur.close()
+      return result
   
   def getNMostFrequentHeuristics(self, name, N, threshold=0.75):
+      """Returns (finalScore, heuristic) pairs, ordered by number of uses
+and then by finalScore"""
       cur = self.__db.cursor()
-      query = ("SELECT formula FROM Heuristic"
+      query = ("SELECT score/useCount AS finalScore, formula FROM Heuristic"
                " JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID"
                " WHERE HeuristicKind.name=?"
-               "  AND Heuristic.score/Heuristic.useCount > ?"
+               "  AND finalScore > ?"
                " ORDER BY Heuristic.useCount DESC,"
-               "  Heuristic.score/Heuristic.useCount DESC"
+               "  finalScore DESC"
                " LIMIT ?")
       cur.execute(query, (name, threshold, N))
-      result = [row[0] for row in cur.fetchall()]
+      result = [(row[0], row[1]) for row in cur.fetchall()]
       cur.close()
       return result
   

@@ -1,5 +1,6 @@
 """Framework implementing long term learning of heuristics """
 import random
+import advancedrandom
 import xml.dom.minidom
 import maximaparser
 import heuristicdb
@@ -15,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 #---------------- Config ------------------
-CONF_MIN_TRIAL_NUMBER = 8
-CONF_EXPLORATION_PROBABILITY = 0.7
-CONF_PICK_BEST_N = 5
+CONF_MIN_TRIAL_NUMBER = 16
+CONF_EXPLORATION_PROBABILITY = 0.3
+CONF_PICK_BEST_N = 10
 #------------------------------------------
 
 def import_object(moduleName, objectName):
@@ -357,7 +358,7 @@ heuristics in the database  """
                                     missing_heur.max_val)
           logger.debug(str(heur))
       else:  
-          formula = random.choice(bestN)
+          formula = advancedrandom.random_roulette_selection(bestN)
           heur = missing_heur.derive_heuristic(formula)
       
           if random.random() < CONF_EXPLORATION_PROBABILITY:
@@ -561,7 +562,7 @@ getting the current best heuristics, without modifying them"""
     for heur in neededHeuristics:
         kind = heur.name
         heuristicLists[kind] = [heur.derive_heuristic(formula)
-                                for formula 
+                                for (finalScore, formula)
                                 in get_n_heuristics(kind, eliteSize)]
 
     #Build the sets
@@ -622,10 +623,10 @@ result inside the candidates list taken from the additional parameters"""
 
     allHSets = []
 
-    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+    elite = self._generateHSetsByElitism(neededHeuristics, 2, 
                                          self._db.getBestNHeuristics)
     allHSets.extend(elite)
-    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+    elite = self._generateHSetsByElitism(neededHeuristics, 2, 
                                          self._db.getNMostFrequentHeuristics)
     allHSets.extend(elite)
     numGenerated = len(allHSets)
