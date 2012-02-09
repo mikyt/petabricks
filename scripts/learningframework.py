@@ -358,15 +358,15 @@ heuristics in the database  """
                                     missing_heur.max_val)
           logger.debug(str(heur))
       else:  
-          formula = advancedrandom.random_roulette_selection(bestN)
-          heur = missing_heur.derive_heuristic(formula)
+          selected_formula = advancedrandom.random_roulette_selection(bestN)
+          heur = missing_heur.derive_heuristic(selected_formula)
       
           if random.random() < CONF_EXPLORATION_PROBABILITY:
               #Generate a new formula by modifying the existing one        
               heur.evolve(missing_heur.available_features)
-              logger.debug("Evolution\nFrom: %s\nTo: %s", formula, heur.formula)
+              logger.debug("Evolution\nFrom: %s\nTo: %s", selected_formula, heur.formula)
           else:
-              logger.debug("No evolution for: %s", formula)
+              logger.debug("No evolution for: %s", selected_formula)
             
       logger.debug("----------------------")
       self[heur.name] = heur
