@@ -90,7 +90,7 @@ following attributes:
         #Their score is not increased, but they are marked as used
         #(and therefore they are penalized)
         logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
-        logger.warning(str(hSet))
+        logger.warning(hSet.toXmlStrings())
         return learningframework.FailedCandidate(hSet, assignScores = False)
 
 
@@ -124,7 +124,8 @@ following attributes:
     
     candidate.speedup = compute_speedup((numDimensions, executionTime), 
                                         reference)
-
+    candidate.numDimensions = numDimensions
+    candidate.executionTime = executionTime
 
     return candidate
     
@@ -239,6 +240,9 @@ class LearningCompiler(learningframework.Learner):
         logger.info("The reference performance with default heuristics is %s",
                     (additionalParameters["reference_performance"]))
         
+        default_candidate.numDimensions = numDimensions
+        default_candidate.executionTime = executionTime
+
         
     except tunerwarnings.AlwaysCrashes:
       logger.error("Autotuning with default heuristics always crashes!")
