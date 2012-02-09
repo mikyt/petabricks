@@ -146,7 +146,7 @@ class HeuristicDB:
     kindID=self.storeHeuristicKind(heuristic.name) 
     cur = self.__db.cursor()
     query = "UPDATE Heuristic SET " \
-            "score=((score*useCount)+(?/?))/(useCount+?), " \
+            "score=((score*useCount)+(?*?))/(useCount+?), " \
             "useCount=useCount+? " \
             "WHERE kindID=? AND formula=?"
     cur.execute(query, (newScore, newValidUses, newUses, newUses, kindID, 
