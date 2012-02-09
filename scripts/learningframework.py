@@ -533,22 +533,22 @@ class Learner(object):
 
   def storeCandidatesDataInDB(self, candidates):
     """Store data from all the info file, with score.
-The candidates should already be ordered (from the best to the worst)"""
-    numCandidates = len(candidates)
+The candidates should already be ordered (from the best one to the worst one)"""
     count = 0
+    pp=pprint.PrettyPrinter()
     for candidate in candidates:
-      pp=pprint.PrettyPrinter()
-      logger.info("Storing this heuristic set:\n%s",
-                  pp.pformat(candidate.heuristicSet))
-      points = (numCandidates - count) / float(numCandidates)
+        h_set = candidate.heuristicSet
+        logger.info("Storing this heuristic set:\n%s",
+                    pp.pformat(h_set))
 
-      if candidate.assignScores and not candidate.failed:
-	self._db.updateHSetWeightedScore(candidate.heuristicSet, points)
-      else:
-	self._db.markAsUsed(candidate.heuristicSet, uses=1)
+        if candidate.assignScores and not candidate.failed:
+            points = candidate.speedup
+            self._db.updateHSetWeightedScore(h_set, points)
+        else:
+            self._db.markAsUsed(h_set, uses=1)
 
 
-      count = count +1
+        count = count +1
 
   def _generateHSetsByElitism(self, neededHeuristics, eliteSize, 
                               get_n_heuristics):
@@ -677,7 +677,6 @@ result inside the candidates list taken from the additional parameters"""
 
         candidates.sort()
 
-        import pprint
         pp = pprint.PrettyPrinter()
         logger.debug(pp.pformat(candidates))
     

@@ -24,7 +24,26 @@ CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 logger = logging.getLogger(__name__)
 
 
-  
+def compute_speedup(candidate, reference):
+    (c_dimensions, c_exec_time) = candidate
+    (r_dimensions, r_exec_time) = reference
+    
+    if c_dimensions == r_dimensions:
+        speedup = r_exec_time / c_exec_time
+        return speedup
+        
+    #Dimensions are different: compute the execution time of a single cell of 
+    #the matrix, on average. 
+    #The speedup is given relative to the time of the single cells
+    #NB: if r_dimensions==c_dimensions this formula is equal to the other one
+    
+    r_time_single_cell = r_exec_time / (r_dimensions**2)
+    c_time_single_cell = c_exec_time / (c_dimensions**2)
+    
+    speedup = r_time_single_cell / c_time_single_cell
+    return speedup
+        
+    
 def test_heuristic_set(benchmark, count, hSet, additionalParameters):
     """Return the object representing a tested candidate, with (at least) the
 following attributes:
@@ -44,62 +63,68 @@ following attributes:
     max_tuning_size = additionalParameters["max_tuning_size"]
     max_tuning_time = additionalParameters["max_tuning_time"]
     dirnumber = count + 1
-    print "Testing candidate %d" % dirnumber #TODO: remove
+    logger.info("Testing candidate %d", dirnumber)
+    
     #Define more file names
-
     outDir = os.path.join(basesubdir, str(dirnumber))
     if not os.path.isdir(outDir):
-      #Create the output directory
-      os.makedirs(outDir)
+        #Create the output directory
+        os.makedirs(outDir)
     binary= os.path.join(outDir, basename)
 
     heuristicsFile= os.path.join(outDir, CONF_HEURISTIC_FILE_NAME)
     hSet.toXmlFile(heuristicsFile)
 
     status = pbutil_support.compileBenchmark(pbc_exe,
-                                     benchmark,
-                                     binary = binary,
-                                     heuristics = heuristicsFile,
-                                     jobs = threads,
-                                     timeout = CONF_TIMEOUT)
+                                             benchmark,
+                                             binary = binary,
+                                             heuristics = heuristicsFile,
+                                             jobs = threads,
+                                             timeout = CONF_TIMEOUT)
     if status != 0:
-      #Compilation has failed!
-      #Take the data about the heuristics from the input heuristics file
-      #instead of the info file (because there no such file!).
-      #We are not sure that all the heuristics in the input
-      #file have been used, but they had the compilation fail.
-      #Their score is not increased, but they are marked as used
-      #(and therefore they are penalized)
-      logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
-      logger.warning(str(hSet))
-      return learningframework.FailedCandidate(hSet, assignScores = False)
+        #Compilation has failed!
+        #Take the data about the heuristics from the input heuristics file
+        #instead of the info file (because there no such file!).
+        #We are not sure that all the heuristics in the input
+        #file have been used, but they had the compilation fail.
+        #Their score is not increased, but they are marked as used
+        #(and therefore they are penalized)
+        logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
+        logger.warning(str(hSet))
+        return learningframework.FailedCandidate(hSet, assignScores = False)
 
 
     #Autotune
     try:
-      sgatuner.autotune_withparams(binary, candidates, n=max_tuning_size, 
-                                   max_time=max_tuning_time, threads=threads)
-
-      #Candidate has not failed: mark as such
-      tunedCandidate = candidates[-1]
-
+        sgatuner.autotune_withparams(binary, candidates, n=max_tuning_size, 
+                                     max_time=max_tuning_time, threads=threads)
     except tunerwarnings.AlwaysCrashes:
-      logger.warning("Candidate %d always crashes during tuning with hset:", dirnumber)
-      logger.warning(str(hSet))
-      return learningframework.FailedCandidate(hSet, assignScores = True)
+        logger.warning("Candidate %d always crashes during tuning with hset:", 
+                       dirnumber)
+        logger.warning(str(hSet))
+        return learningframework.FailedCandidate(hSet, assignScores = True)
 
-    #Store the actually used hSet inside the candidate
+
+    #Fetch the actually used hSet
     infoFile = os.path.join(basesubdir,
                             str(dirnumber),
                             basename+".info")
     hSet = learningframework.HeuristicSet()
     hSet.importFromXml(infoFile)
     
-
-    candidate = learningframework.SuccessfulCandidate(hSet)
+    #Return the candidate
+    tuned_candidate = candidates[-1]
     
-    candidate.numDimensions = len(tunedCandidate.metrics[0])
-    candidate.executionTime = tunedCandidate.metrics[0][2**(candidate.numDimensions-1)].mean()
+    candidate = learningframework.SuccessfulCandidate(hSet)
+
+    numDimensions = len(tuned_candidate.metrics[0])
+    executionTime = tuned_candidate.metrics[0][2**(numDimensions-1)].mean()
+    
+    reference = additionalParameters["reference_performance"]
+    
+    candidate.speedup = compute_speedup((numDimensions, executionTime), 
+                                        reference)
+
 
     return candidate
     
@@ -121,11 +146,12 @@ class LearningCompiler(learningframework.Learner):
   @staticmethod
   def _candidateSortingKey(candidate):
       """Generates a comparison key for a candidate.
-    Candidates are sorted by the number of dimensions (the highest, the better),
-    then by average execution time of the biggest dimension (the lower the better)"""
+    Candidates are sorted by speedup wrt the reference candidate (compiled
+    with default heuristics).
+    The first candidate is the one with the bigger speedup"""
       if candidate.failed:
-        return (float('inf'), float('inf'))      
-      return (1.0 / candidate.numDimensions, candidate.executionTime)
+        return float('inf')
+      return (1.0 / candidate.speedup)
   
   def _getMaxTuningSize(self):
       return self._n
@@ -164,7 +190,9 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["threads"] = self._threads
     additionalParameters["max_tuning_size"] = self._n
     additionalParameters["max_tuning_time"] = self._maxTuningTime
-
+    
+    candidates = additionalParameters["candidates"]
+    
     #Compile with default heuristics
     outDir = os.path.join(basesubdir, "0")
     if not os.path.isdir(outDir):
@@ -177,9 +205,44 @@ class LearningCompiler(learningframework.Learner):
                                              jobs = self._threads,
                                              defaultHeuristics = True)
     if status != 0:
-      logger.error("Compile FAILED with default heuristics - "
-                   "Compilation aborted")
+      logger.error("Compile FAILED with default heuristics (status: %d)- "
+                   "Compilation aborted", (status))
       return status
+
+    #Autotune
+    tmp_candidates=[]
+    try:
+        sgatuner.autotune_withparams(binary, 
+                                     tmp_candidates, 
+                                     n=self._n, 
+                                     max_time=self._maxTuningTime)
+
+        #Fetch the actually used hSet
+        infoFile = os.path.join(outDir, basename+".info")
+        h_set = learningframework.HeuristicSet()
+        h_set.importFromXml(infoFile)
+        
+        default_candidate = learningframework.SuccessfulCandidate(h_set)
+        default_candidate.speedup = 1 #This is the reference for the speedup
+        default_candidate.originalIndex = -1
+        candidates.append(default_candidate)
+        
+        #Store for later use by the candidates
+        tuned_candidate = tmp_candidates[-1]
+        numDimensions = len(tuned_candidate.metrics[0])
+        executionTime = tuned_candidate.metrics[0][2**(numDimensions-1)].mean()
+        
+        additionalParameters["reference_performance"] = (
+            (numDimensions, executionTime)
+        )
+        
+        logger.info("The reference performance with default heuristics is %s",
+                    (additionalParameters["reference_performance"]))
+        
+        
+    except tunerwarnings.AlwaysCrashes:
+      logger.error("Autotuning with default heuristics always crashes!")
+      return -1
 
     #Get the full set of used heuristics and available features
     infoFile = binary+".info"
@@ -269,7 +332,7 @@ if __name__ == "__main__":
     petabricks_path = os.path.normpath(petabricks_path)
     examples_path= os.path.join(petabricks_path, "examples")  
     pbc = os.path.join(petabricks_path,"src/pbc")
-    errorfile = pbc + "error-log.dat"
+    errorfile = pbc + "/error-log.dat"
     
     mylogger.configureLogging(errorfile)
     

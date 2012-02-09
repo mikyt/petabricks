@@ -1,5 +1,8 @@
-import sqlite3
+import logging
 import os
+import sqlite3
+
+logger = logging.getLogger(__name__)
 
 class HeuristicDB:
   def __init__(self):
@@ -95,25 +98,20 @@ class HeuristicDB:
     cur.close()
     
   
-  def _computeScore(self, heuristic, points):
+  def _valid_uses(self, heuristic):
     assert heuristic.uses is not None
     assert heuristic.tooLow is not None
     assert heuristic.tooHigh is not None
     
     uses = heuristic.uses
     outofbounds = heuristic.tooLow + heuristic.tooHigh
-    return points * (uses - outofbounds)
+    return uses - outofbounds
     
-  def addToScore(self, hSet, points, weightedScore=True):
+  def addToScore(self, hSet, score):
     """Increase the score of a set of heuristics by the given amount"""
     #TODO: also store it as a set
       
     for name, heuristic in hSet.iteritems():
-      if weightedScore:
-	score = self._computeScore(heuristic, points)
-      else:
-	score = points
-      
       self.increaseHeuristicScore(name, heuristic.formula, score)
       
       
@@ -129,30 +127,36 @@ class HeuristicDB:
       self.updateHeuristicWeightedScore(heuristic, points)
     
   def updateHeuristicWeightedScore(self, heuristic, points):
-    """The new score of the heuristic is given by the average of the current score and the new score,
-    rescaled in such a way to have the use count equal to the sum of the use count of the old and new scores:
+    """The new score of the heuristic is given by the weighted average of the 
+    current score and the new score.
+    The weight is modified in such a way that only valid uses actively 
+    contribute to the final score
     
-    finalScore = ((oldScore/oldUses) + (newScore/newUses))/2 * (oldUses+newUses)
+    finalScore = ((oldScore*oldUses) + (newScore*newValidUses)) / (oldUses+newUses)
     finalUses = oldUses + newUses"""
-    newScore = self._computeScore(heuristic, points)
+    newScore = points
+    newValidUses = self._valid_uses(heuristic)
     newUses = heuristic.uses
     
-    print "UPDATING Heuristic"
-    print heuristic
-    print "newScore: %f" % newScore
+    logger.debug("UPDATING Heuristic")
+    logger.debug(heuristic)
+    logger.debug("newScore=%f, newUses=%d, newValidUses=%d", newScore, newUses, 
+                                                              newValidUses)
     
     kindID=self.storeHeuristicKind(heuristic.name) 
     cur = self.__db.cursor()
     query = "UPDATE Heuristic SET " \
-            "score=((score/useCount)+(?/?))/2 *(useCount+?), " \
+            "score=((score*useCount)+(?/?))/(useCount+?), " \
             "useCount=useCount+? " \
             "WHERE kindID=? AND formula=?"
-    cur.execute(query, (newScore, newUses, newUses, newUses, kindID, heuristic.formula))
+    cur.execute(query, (newScore, newValidUses, newUses, newUses, kindID, 
+                        heuristic.formula))
     if cur.rowcount == 0:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, ?, ?)"
       print "NEW!!!"
-      cur.execute(query, (kindID, heuristic.formula, heuristic.uses, newScore))
+      cur.execute(query, (kindID, heuristic.formula, heuristic.uses, 
+                          newScore*heuristic.uses))
     self.__db.commit()
     cur.close()
     
@@ -211,7 +215,7 @@ and then by finalScore"""
 database, with maximum score, so that they will be selected with maximum likelihood"""
     for hSet in heuristicSets:
       self.markAsUsed(hSet, 1)
-      self.addToScore(hSet, maximumScore, weightedScore=False)
+      self.addToScore(hSet, maximumScore)
       
   def close(self):
     self.__db.close()
