@@ -212,7 +212,7 @@ class HeuristicsGraphDataGenerator(object):
 
     outFile.write(programName)
 
-    scores = self._db.getHeuristicsFinalScoreByKind(heuristicKind, 
+    scores = self._db.getHeuristicsScoreByKind(heuristicKind, 
                                                     MAX_PRINTED_HEURISTICS)
 
     #Add new heuristics to the list keeping the order of the previous ones
