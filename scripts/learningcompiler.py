@@ -36,9 +36,13 @@ def compute_speedup(candidate, reference):
     #the matrix, on average. 
     #The speedup is given relative to the time of the single cells
     #NB: if r_dimensions==c_dimensions this formula is equal to the other one
+    r_matrix_width = 2**(r_dimensions-1)
+    c_matrix_width = 2**(c_dimensions-1)
+    r_num_cells = r_matrix_width**2
+    c_num_cells = c_matrix_width**2
     
-    r_time_single_cell = r_exec_time / (r_dimensions**2)
-    c_time_single_cell = c_exec_time / (c_dimensions**2)
+    r_time_single_cell = r_exec_time / r_num_cells
+    c_time_single_cell = c_exec_time / c_num_cells
     
     speedup = r_time_single_cell / c_time_single_cell
     return speedup
