@@ -64,6 +64,8 @@ def parseCmdline(petabricks_path):
                     help="maximum number of threads to be used for each test",
                     default=None)
   parser.add_option("--usemapreduce",
+                    help=("Use the mincemeat.py library to distribute the "
+                          "computation with a mapreduce approach"),
                     action="store_true", 
                     dest="usemapreduce", 
                     default=False)
