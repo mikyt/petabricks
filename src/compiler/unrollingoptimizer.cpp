@@ -25,6 +25,7 @@
  *                                                                           *
  *****************************************************************************/
 
+#include "featurecomputer.h"
 #include "unrollingoptimizer.h"
 
 void petabricks::UnrollingOptimizer::setUnrolledLoopCondition(RIRLoopStmt& loop, int unrollingNumber) {
@@ -122,13 +123,13 @@ void petabricks::UnrollingOptimizer::after(RIRStmtCopyRef& stmt) {
     //Unable to determine the limit of the loop: do nothing
     return;
   }
-  
-  ValueMap features;
+  ValueMap features = get_rirnode_count_features(*(loop.body()), "UnrollingOptimizer");
   features["loopNestingLevel"] = getLoopNestingLevel(*this);
   features["loopBodySize"] = getLoopBodySize(*this);
   features["loopBodyOps"] = getLoopBodyOps(*this);
   HeuristicPtr& unrollingHeur = HeuristicManager::instance().getHeuristic("UnrollingOptimizer_unrollingNumber");
   int unrollingNumber =unrollingHeur->eval(features);
+  JTRACE("Unrolling evaluated")(unrollingNumber);
   
   if (unrollingNumber < 2) {
     //The best unrolling is no unrolling: nothing to do!

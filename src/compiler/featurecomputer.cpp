@@ -29,11 +29,11 @@
 
 #define countfeature(type) \
   feature[prefix + RIRNode::typeStr((type)) + "_count"] = \
-    bodyir->subnodeCount((type))
+    bodyir.subnodeCount((type))
   
   
 petabricks::ValueMap petabricks::get_rirnode_count_features(
-                                                      RIRBlockCopyRef bodyir,
+                                                      RIRNode& bodyir,
                                                       std::string prefix) {
   ValueMap feature;
   if (prefix!="") prefix=prefix+"_";

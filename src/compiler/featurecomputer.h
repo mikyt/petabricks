@@ -31,7 +31,7 @@
 namespace petabricks {
 typedef std::map<std::string, double> ValueMap;
 
-ValueMap get_rirnode_count_features(RIRBlockCopyRef bodyir,
+ValueMap get_rirnode_count_features(RIRNode& bodyir,
                                     std::string prefix="");
 
 }
