@@ -57,8 +57,8 @@ namespace{
   }
 }
 
-const char* petabricks::RIRNode::typeStr() const {
-  switch(type()){
+const char* petabricks::RIRNode::typeStr(const Type t) {
+  switch(t){
     case EXPR        : return "EXPR";
     case EXPR_NIL    : return "EXPR_NIL";
     case EXPR_OP     : return "EXPR_OP";
@@ -78,6 +78,10 @@ const char* petabricks::RIRNode::typeStr() const {
     case BLOCK       : return "BLOCK";
     default          : return "INVALID";
   }
+}
+
+const char* petabricks::RIRNode::typeStr() const {
+  return typeStr(type());
 }
 
 template<typename A>
@@ -607,6 +611,11 @@ void petabricks::RIRLoopStmt::InductionVariableIdentifier::before(RIRExprCopyRef
   abort();
 }
 
-unsigned int petabricks::RIRBlockStmt::opsNumber() const { 
-    return _block->opsNumber();
+unsigned int petabricks::RIRBlockStmt::subnodeCount(Type kind) const {
+  unsigned int count = 0;
+  if (type() == kind) {
+    count++;
+  }
+  count += _block->subnodeCount(kind);
+  return count;
 }

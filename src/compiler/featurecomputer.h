@@ -24,61 +24,15 @@
  *    http://projects.csail.mit.edu/petabricks/                              *
  *                                                                           *
  *****************************************************************************/
-#ifndef HEURISTICMANAGER_H
-#define HEURISTICMANAGER_H
+#ifndef FEATURECOMPUTER_H
+#define FEATURECOMPUTER_H
 
-#include <map>
-
-#include "common/jrefcounted.h"
-#include "common/jassert.h"
-
-#include "heuristic.h"
-#include "dbmanager.h"
-#include "maximawrapper.h"
-
+#include "ruleir.h"
 namespace petabricks {
+typedef std::map<std::string, double> ValueMap;
 
-class HeuristicManager {
-  public:
-  ///Singleton instance
-  static HeuristicManager& instance() { static HeuristicManager inst;
-                                        return inst;
-                                      }
-                                              
-                                              
-  void registerDefault(const std::string name, const std::string formula) {
-          _defaultHeuristics[name] = HeuristicPtr(new Heuristic(formula));
-        }
-  void loadFromFile(const std::string fileName);
-  
-  HeuristicPtr& getDefaultHeuristic(const std::string name);
-  HeuristicPtr& getHeuristic(const std::string name);
-  
-  void setMin(const std::string heuristicName, const double min) { 
-                              internal_getHeuristic(heuristicName)->setMin(min); 
-                            }
-              
-  void setMax(const std::string heuristicName, const double max) {
-                              internal_getHeuristic(heuristicName)->setMax(max);
-                            }
-  
-  const HeuristicMap& usedHeuristics() const { return _usedHeuristics; }
-  void useDefaultHeuristics(const bool useDefaultHeuristics) {
-    _useDefaultHeuristics = useDefaultHeuristics;
-  }
-  
-private: 
-  HeuristicPtr& internal_getDefaultHeuristic(const std::string name);
-  HeuristicPtr& internal_getHeuristic(const std::string name);
-  
-private:
-  HeuristicMap _heuristicCache;
-  HeuristicMap _defaultHeuristics;
-  HeuristicMap _usedHeuristics;
-  HeuristicMap _fromFile;
-  DBManager _db;
-  bool _useDefaultHeuristics;
-};
+ValueMap get_rirnode_count_features(RIRBlockCopyRef bodyir,
+                                    std::string prefix="");
 
 }
 

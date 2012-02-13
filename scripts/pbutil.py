@@ -63,7 +63,6 @@ def setmemlimit(n = getmemorysize()):
 
 
 def parallelRunJobs(jobs, nParallelJobs=None):
-  outFile=open("/tmp/parallelRunJobs.txt", "w")
   class JobInfo:
     def __init__(self, id, fn):
       self.id=id
@@ -83,13 +82,11 @@ def parallelRunJobs(jobs, nParallelJobs=None):
         #child
         progress.disable()
         self.fd.close()
-        class Redir():
+        class Redir:
           def __init__(self, fd):
             self.fd=fd
           def write(self, s):
             self.fd.sendall(s)
-            outFile.write(s)
-            outFile.flush()
         sys.stdout = Redir(w)
         #sys.stderr = sys.stdout
         try:
@@ -296,7 +293,8 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None):
     jobs_per_pbc = cpuCount()
   else:
     jobs_per_pbc=max(1, 2*cpuCount() / len(benchmarks))
-  compiler = learningcompiler.LearningCompiler(pbc, heuristicSetFileName, jobs=jobs_per_pbc)
+  compiler = learningcompiler.LearningCompiler(pbc, heuristicSetFileName,
+                                               threads=jobs_per_pbc)
 
   def innerCompileBenchmark(name):
     print name.ljust(benchmarkMaxLen)

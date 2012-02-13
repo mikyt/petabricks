@@ -26,7 +26,20 @@
  *****************************************************************************/
 #include "heuristic.h"
 
+void petabricks::Heuristic::recordAvailableFeatures(const ValueMap 
+                                                        featureValues) {
+  for(ValueMap::const_iterator i=featureValues.begin(),
+                               e=featureValues.end();
+      i != e;
+      ++i) {
+    std::string feature_name = i->first;
+    _features.insert(feature_name);
+  }
+}
+
 double petabricks::Heuristic::eval (const ValueMap featureValues) {
+  recordAvailableFeatures(featureValues);
+  
   double value = evalWithoutLimits(featureValues);
   
   _uses++;

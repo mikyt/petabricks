@@ -528,8 +528,14 @@ class Candidate:
     for f in ('config', 'stats', 'stats_raw'):
       f=os.path.join(self.outputdir,f)
       if os.path.isfile(f):
-        os.unlink(f)
-    os.rmdir(self.outputdir)
+        try:  
+          os.unlink(f)
+        except OSError:
+          pass
+    try:
+      os.rmdir(self.outputdir)
+    except OSError:
+      pass
   
   def timingResults(self, n=None):
     if n is None:

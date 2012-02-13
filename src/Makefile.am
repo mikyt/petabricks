@@ -36,7 +36,8 @@ noinst_HEADERS = \
   compiler/dbmanager.h \
   compiler/unrollingoptimizer.h \
   compiler/tinyxml.h \
-  compiler/tinystr.h
+  compiler/tinystr.h \
+  compiler/featurecomputer.h
 
 pkglib_HEADERS=  \
   common/hash.h \
@@ -146,7 +147,8 @@ libpbcompiler_a_SOURCES = \
   compiler/tinyxml.cpp \
   compiler/tinyxmlerror.cpp \
   compiler/tinyxmlparser.cpp \
-  compiler/tinystr.cpp
+  compiler/tinystr.cpp \
+  compiler/featurecomputer.cpp
 
 libpbruntime_a_LFLAGS =
 libpbruntime_a_CXXFLAGS = -I$(srcdir)/runtime

@@ -112,6 +112,34 @@ public:
     _callgraph[caller].push_back(callee);
   }
 
+  
+  void addHeuristicFeatures(const std::string heuristicName, 
+                            const HeuristicPtr& heuristic) {
+    
+    _os << "  <availablefeatures heuristic_name=\"" 
+        << jalib::escapeXML(heuristicName) << "\">\n";
+    std::set<std::string>& featureSet = heuristic->getFeatureSet();
+    for(std::set<std::string>::const_iterator i=featureSet.begin(),
+                                              e=featureSet.end();
+        i != e;
+        ++i) {
+      std::string featureName = *i;
+      _os << "    <feature name=\"" << featureName << "\" />\n";
+    }
+    
+    _os << "  </availablefeatures>\n";
+  }
+  
+  void addAllHeuristicFeatures(const HeuristicMap& heuristics) {
+    for(HeuristicMap::const_iterator i=heuristics.begin(), e=heuristics.end();
+        i != e;
+        ++i) {
+      const std::string name = i->first;
+      const HeuristicPtr& heuristic = i->second;
+      addHeuristicFeatures(name, heuristic);
+    }
+  }
+
   void addHeuristics(const HeuristicMap& heuristics) {
     for(HeuristicMap::const_iterator i=heuristics.begin(), e=heuristics.end();
         i != e;
@@ -123,17 +151,21 @@ public:
   }
   
   void addHeuristic(const std::string name, const HeuristicPtr& heuristic) {
-    std::string formula = heuristic->usedFormula()->toCppString();
+    std::string formula = heuristic->usedFormula()->toString();
     unsigned int uses = heuristic->uses();
     unsigned int tooLow = heuristic->tooLow();
     unsigned int tooHigh = heuristic->tooHigh();
+    double max = heuristic->getMax();
+    double min = heuristic->getMin();
     
     _os << "  <heuristic";
     _os << " name=\"" << name << "\"";
     _os << " formula=\"" << jalib::escapeXML(formula) << "\"";
-    _os << " uses=\"" << jalib::escapeXML(jalib::XToString(uses)) << "\"";
-    _os << " tooHigh=\"" << jalib::escapeXML(jalib::XToString(tooHigh)) << "\"";
-    _os << " tooLow=\"" << jalib::escapeXML(jalib::XToString(tooLow)) << "\"";
+    _os << " uses=\"" << jalib::XToString(uses) << "\"";
+    _os << " tooHigh=\"" << jalib::XToString(tooHigh) << "\"";
+    _os << " tooLow=\"" << jalib::XToString(tooLow) << "\"";
+    _os << " max=\"" << jalib::XToString(max) << "\"";
+    _os << " min=\"" << jalib::XToString(min) << "\"";
     _os << " />\n";
   }
   

@@ -107,17 +107,33 @@ AC_CHECK_HEADERS([cblas.h],  [], [])
 AC_CHECK_HEADERS([Accelerate/Accelerate.h], [], [])
 AC_CHECK_HEADERS([sqlite3.h],      [], [AC_MSG_ERROR([failed to find sqlite3.h header file])])
 
-AC_SEARCH_LIBS([MD5_Init], [crypto ssl], [], [AC_MSG_ERROR([missing package libssl-dev])])
 
-AC_CHECK_LIB([cblas],      [cblas_dgemm],    [], [])
-AC_CHECK_LIB([blas],       [cblas_dgemm],    [], [AC_MSG_WARN([failed to find -lblas, some benchmarks may not work])])
 AC_CHECK_LIB([fftw3],      [fftw_malloc],    [], [AC_MSG_WARN([failed to find -lfftw3, some benchmarks may not work])])
-AC_CHECK_LIB([lapack],     [dposv_],         [], [AC_MSG_WARN([failed to find -llapack, some benchmarks may not work])])
 AC_CHECK_LIB([m],          [cos],            [], [AC_MSG_WARN([failed to find -lm, some benchmarks may not work])])
+AC_CHECK_LIB([gfortran],   [_gfortran_compare_string], [], [])
 AC_CHECK_LIB([pthread],    [pthread_create], [], [AC_MSG_WARN([failed to find -lpthread, some benchmarks may not work])])
 AC_CHECK_LIB([rt],         [clock_gettime],  [],
                         [AC_DEFINE([USE_GETTIMEOFDAY],[],[define if clock_gettime() doesnt work])])
-AC_CHECK_LIB([sqlite3],	   [sqlite3_open],   [], [AC_MSG_ERROR([failed to find -lsqlite, unable to compile the long term learning for heuristics])])
+AC_CHECK_LIB([dl],	   [dlopen],   [], [])
+AC_CHECK_LIB([sqlite3],	   [sqlite3_open],   [], [AC_MSG_ERROR([failed to find -lsqlite3, unable to compile the long term learning for heuristics])])
+
+
+AC_SEARCH_LIBS([MD5_Init], [crypto ssl], [], [AC_MSG_ERROR([missing package libssl-dev])])
+
+#Some blas implementations require atlas to be loaded.
+#In turn, altas might require some other libraries
+#The following code loads all of them, if they are available
+AC_SEARCH_LIBS([lsame_], [f77blas])
+AC_SEARCH_LIBS([ATL_dgemm], [atlas])
+AC_CHECK_LIB([ptf77blas], [ATL_dpttrsm])
+AC_SEARCH_LIBS([cblas_dgemm], [cblas blas])
+
+if test "$ac_cv_search_cblas_dgemm" = "no"; then
+	AC_MSG_WARN([failed to find either -lblas or -lcblas, some benchmarks may not work])
+fi
+
+AC_SEARCH_LIBS([dposv_], [lapack])
+
 ################################################################################
 # COMPILER PROPERTIES ##########################################################
 ################################################################################

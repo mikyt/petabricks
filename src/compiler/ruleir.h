@@ -119,6 +119,7 @@ public:
   RIRNode(Type t) : _type(t) {}
   Type type() const { return _type; }
   const char* typeStr() const;
+  static const char* typeStr(const Type t);
   virtual std::string debugStr() const;
   bool isExpr()  const { return (_type&EXPR)  != 0; }
   bool isStmt()  const { return (_type&STMT)  != 0; }
@@ -151,10 +152,13 @@ public:
     return i->second;
   }
   
+  /** Return the number of subnodes of a given type this node includes.
+   * The node itself is counted if it is of the correct type. */
+  virtual unsigned int subnodeCount(Type type) const = 0;
+  
   /** Return the number of operations executed by this node, approximated
    * by the number of EXPR_OP it contains */
-  virtual unsigned int opsNumber() const = 0;
-  
+  unsigned int opsNumber() const { return subnodeCount(EXPR_OP); }
 protected:
   Type _type;
   AnnotationT _annotations;
@@ -226,17 +230,17 @@ public:
   ///Return the Right Hand Side of an assignment expression
   RIRExprCopyRef getRHS(std::string splitToken = "=") const;
   
-  virtual unsigned int opsNumber() const {
-    if(type()==EXPR_OP) {
-      return 1;
+  virtual unsigned int subnodeCount(Type kind) const {
+    unsigned int count = 0;
+    if (type()==kind) {
+      count ++;
     }
-    unsigned int sum = 0;
     for (RIRExprList::const_iterator i=_parts.begin(), e=_parts.end();
          i != e;
          ++i) {
-      sum += (*i)->opsNumber();
+      count += (*i)->subnodeCount(kind);
     }
-    return sum;
+    return count;
   }
 protected:
   std::string _str;
@@ -296,16 +300,20 @@ public:
   int numExprs() const { return (int)_exprs.size(); }
   
   virtual const RIRBlockCopyRef& extractBlock() const { UNIMPLEMENTED(); return *static_cast<const RIRBlockCopyRef*>(0); }
-  
-  virtual unsigned int opsNumber() const { unsigned int sum = 0;
-                                           for (RIRExprList::const_iterator i=_exprs.begin(),
-                                                                            e=_exprs.end();
-                                                i != e;
-                                                ++i) {
-                                             sum += (*i)->opsNumber();
-                                           }
-                                           return sum;
-                                         }
+                                         
+  virtual unsigned int subnodeCount(Type kind) const {
+                              unsigned int count = 0;
+                              if (type() == kind) {
+                                count++;
+                              }
+                              for (RIRExprList::const_iterator i=_exprs.begin(),
+                                                               e=_exprs.end();
+                                   i != e;
+                                   ++i) {
+                                count += (*i)->subnodeCount(kind);
+                              }
+                              return count;
+                            }
 protected:
   RIRExprList _exprs;
 };
@@ -460,6 +468,19 @@ public:
            incPart()->opsNumber() +
            body()->opsNumber();
   }
+ 
+  virtual unsigned int subnodeCount(Type kind) const {
+                                        unsigned int count = 0;
+                                        if (type() == kind) {
+                                          count++;
+                                        }
+                                        count += declPart()->subnodeCount(kind);
+                                        count += testPart()->subnodeCount(kind);
+                                        count += incPart()->subnodeCount(kind);
+                                        count += body()->subnodeCount(kind);
+                                       
+                                       return count;
+                                      }
   
 private: //Methods
   ///Compute the induction variable. Also, store the iteration direction and the
@@ -499,9 +520,10 @@ public:
         || _body->containsLeaf(val);
   }
   
-  virtual unsigned int opsNumber() const { return RIRStmt::opsNumber() +
-                                                  _body->opsNumber();
-                                         }
+  virtual unsigned int subnodeCount(Type kind) const {
+                return RIRStmt::subnodeCount(kind) + _body->subnodeCount(kind);
+              }
+              
 private:
   RIRStmtCopyRef _body;
 };
@@ -525,11 +547,18 @@ public:
   const RIRStmtCopyRef& thenPart() const { return _then; }
   const RIRStmtCopyRef& elsePart() const { return _else; }
   
-  virtual unsigned int opsNumber() const {
-    return condPart()->opsNumber() +
-           thenPart()->opsNumber() +
-           (elsePart() ? elsePart()->opsNumber() : 0);
-  }
+  virtual unsigned int subnodeCount(Type kind) const {
+                                        unsigned int count = 0;
+                                        if (type() == kind) {
+                                          count++;
+                                        }
+                                        count += condPart()->subnodeCount(kind);
+                                        count += thenPart()->subnodeCount(kind);
+                                        if (elsePart()) {
+                                          count += elsePart()->subnodeCount(kind);
+                                        }
+                                        return count;
+                                      }
 private:
   RIRStmtCopyRef _then;
   RIRStmtCopyRef _else;
@@ -549,7 +578,7 @@ public:
   RIRBlockStmt* clone() const;
   bool containsLeaf(const char* val) const;
   const RIRBlockCopyRef& extractBlock() const { return _block; }
-  virtual unsigned int opsNumber() const;
+  virtual unsigned int subnodeCount(Type kind) const;
 private:
   RIRBlockCopyRef _block;
 };
@@ -585,15 +614,21 @@ public:
 
   const RIRStmtList& stmts() const { return _stmts; }
   
-  unsigned int opsNumber() const { unsigned int sum = 0;
-                                   for (RIRStmtList::const_iterator i=_stmts.begin(),
-                                                                    e=_stmts.end();
-                                        i != e;
-                                        ++i) {
-                                     sum += (*i)->opsNumber();
-                                   }
-                                   return sum;
-                                 }
+  virtual unsigned int subnodeCount(Type kind) const {
+    unsigned int count = 0;
+    if (type() == kind) {
+      count++;
+    }
+    for (RIRStmtList::const_iterator i=_stmts.begin(),
+                                     e=_stmts.end();
+         i != e;
+         ++i) {
+      count += (*i)->subnodeCount(kind);   
+    }
+    
+    return count;
+  }
+  
 private:
   RIRStmtList _stmts;
 };

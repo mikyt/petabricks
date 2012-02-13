@@ -57,13 +57,17 @@ precedence = (
   ('left', '^'),
 )
 
-def p_formula_IDENT(p):
-  r'Formula : IDENT'
-  p[0]=FormulaVariable(p[1])
-  
+def p_start(p):
+  r'Start : Formula'
+  p[0] = FormulaContainer(p[1])
+      
 def p_formula_Integer(p):
   r'Formula : Integer'
   p[0]=FormulaInteger(p[1])
+  
+def p_formula_Neg_Integer(p):
+  r"Formula : '-' Integer"
+  p[0]=FormulaInteger( - p[2])
   
 def p_formula_Bool(p):
   r'Formula : Bool'
@@ -72,7 +76,15 @@ def p_formula_Bool(p):
 def p_formula_Float(p):
   r'Formula : Float'
   p[0]=FormulaFloat(p[1])
-  
+
+def p_formula_Neg_Float(p):
+  r"Formula : '-' Float"
+  p[0]=FormulaFloat( - p[2])
+
+def p_formula_IDENT(p):
+  r'Formula : IDENT'
+  p[0]=FormulaVariable(p[1])
+
 def p_formula_paren(p):
   r"Formula : '(' Formula ')'"
   p[0]=p[2]
@@ -156,11 +168,7 @@ def p_binop_strfloor(p):
 def p_binop_strceiling(p):
   r"FormulaBinop : STR_CEILING '(' Formula ')'"
   p[0]=p[3]
-  
-def p_binop_neg(p):
-  r"FormulaBinop : '-' Formula"
-  p[0]=FormulaBinop("-", FormulaInteger(0), p[2])
-  
+    
 def p_integer(p):
   r'Integer : INTEGER'
   p[0]=int(p[1])
@@ -168,7 +176,7 @@ def p_integer(p):
 def p_bool_t(p):
   r'Bool : BOOL_T'
   p[0]=True
-  
+
 def p_bool_f(p):
   r'Bool : BOOL_F'
   p[0]=False

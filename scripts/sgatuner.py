@@ -564,7 +564,8 @@ def autotune(benchmark, returnBest=None):
                                     config.output_dir,
                                     config.delete_output_dir)
 
-def autotune_withparams(benchmark, returnBest=None, n=None, max_time=None):
+def autotune_withparams(benchmark, returnBest=None, n=None, max_time=None,
+                        threads=None):
   """Executes the autotuning of the benchmark program setting the configuration
 of the autotuner with ONLY the parameters given at the function call.
 
@@ -583,7 +584,10 @@ at the exit form this function"""
     
   if max_time:
     config.max_time=max_time
-                                                                   
+
+  if threads:
+    config.threads=threads
+    
   #Autotune                               
   res = autotune(benchmark, returnBest)                                  
                                                                    
