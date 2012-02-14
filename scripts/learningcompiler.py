@@ -58,7 +58,6 @@ following attributes:
   * heuristicSet (HeuristicSet): the set of heuristics that generated the
                                  program"""
                    
-    candidates=[]
     candidate = None
     basesubdir = additionalParameters["basesubdir"]
     basename = additionalParameters["basename"]
@@ -100,7 +99,7 @@ following attributes:
 
     #Autotune
     try:
-        sgatuner.autotune_withparams(binary, candidates, n=max_tuning_size, 
+        tuned_candidate = sgatuner.autotune_withparams(binary, n=max_tuning_size, 
                                      max_time=max_tuning_time, threads=threads)
     except tunerwarnings.AlwaysCrashes:
         logger.warning("Candidate %d always crashes during tuning with hset:", 
@@ -117,8 +116,6 @@ following attributes:
     hSet.importFromXml(infoFile)
     
     #Return the candidate
-    tuned_candidate = candidates[-1]
-    
     candidate = learningframework.SuccessfulCandidate(hSet)
 
     numDimensions = len(tuned_candidate.metrics[0])
@@ -215,10 +212,8 @@ class LearningCompiler(learningframework.Learner):
       return status
 
     #Autotune
-    tmp_candidates=[]
     try:
-        sgatuner.autotune_withparams(binary, 
-                                     tmp_candidates, 
+        tuned_candidate = sgatuner.autotune_withparams(binary, 
                                      n=self._n, 
                                      max_time=self._maxTuningTime)
 
@@ -233,7 +228,6 @@ class LearningCompiler(learningframework.Learner):
         candidates.append(default_candidate)
         
         #Store for later use by the candidates
-        tuned_candidate = tmp_candidates[-1]
         numDimensions = len(tuned_candidate.metrics[0])
         executionTime = tuned_candidate.metrics[0][2**(numDimensions-1)].mean()
         

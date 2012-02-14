@@ -490,10 +490,8 @@ def init(benchmark, acf=createChoiceSiteMutators, taf=createTunableMutators):
     storagedirs.cur.saveFile(pbutil.benchmarkToBin(benchmark))
   return candidate, tester
 
-def autotuneInner(benchmark, returnBest=None):
-  """Function running the autotuning process.
-If returnBest is specified, it should be a list. The best candidate found will 
-be added to that list"""
+def autotuneInner(benchmark):
+  """Function running the autotuning process."""
   progress.push()
   config.benchmark = benchmark
   candidate, tester = init(benchmark)
@@ -550,8 +548,6 @@ be added to that list"""
     if pop.best and config.output_cfg:
       print pop.best.cfgfile(),"=>" , config.output_cfg
       shutil.copyfile(pop.best.cfgfile(), config.output_cfg)
-    if pop.best and returnBest is not None:
-      returnBest.append(pop.best)
     at = storagedirs.getactivetimers()
     if len(at):
       storagedirs.openCsvStats("timers", at.keys()).writerow(at.values())
@@ -559,12 +555,12 @@ be added to that list"""
       tester.cleanup()
     progress.pop()
 
-def autotune(benchmark, returnBest=None):
-  return storagedirs.callWithLogDir(lambda: autotuneInner(benchmark, returnBest),
+def autotune(benchmark):
+  return storagedirs.callWithLogDir(lambda: autotuneInner(benchmark),
                                     config.output_dir,
                                     config.delete_output_dir)
 
-def autotune_withparams(benchmark, returnBest=None, n=None, max_time=None,
+def autotune_withparams(benchmark, n=None, max_time=None,
                         threads=None):
   """Executes the autotuning of the benchmark program setting the configuration
 of the autotuner with ONLY the parameters given at the function call.
@@ -589,7 +585,7 @@ at the exit form this function"""
     config.threads=threads
     
   #Autotune                               
-  res = autotune(benchmark, returnBest)                                  
+  res = autotune(benchmark)                                  
                                                                    
   #Restore previous config parameters                              
   config.__dict__ = old_config_dict.copy()
