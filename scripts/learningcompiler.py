@@ -99,7 +99,8 @@ following attributes:
         tuned_candidate = sgatuner.autotune_withparams(binary,
                                                        n=max_tuning_size,
                                                        max_time=max_tuning_time,
-                                                       threads=threads)
+                                                       threads=threads,
+                                                       delete_output_dir=True)
     except tunerwarnings.AlwaysCrashes:
         logger.warning("Candidate %d always crashes during tuning with hset:", 
                        dirnumber)
@@ -212,8 +213,9 @@ class LearningCompiler(learningframework.Learner):
     #Autotune
     try:
         tuned_candidate = sgatuner.autotune_withparams(binary, 
-                                     n=self._n, 
-                                     max_time=self._maxTuningTime)
+                                                   n=self._n, 
+                                                   max_time=self._maxTuningTime,
+                                                   delete_output_dir=True)
 
         #Fetch the actually used hSet
         infoFile = os.path.join(outDir, basename+".info")

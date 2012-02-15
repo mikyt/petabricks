@@ -561,7 +561,7 @@ def autotune(benchmark):
                                     config.delete_output_dir)
 
 def autotune_withparams(benchmark, n=None, max_time=None,
-                        threads=None):
+                        threads=None, delete_output_dir=None):
   """Executes the autotuning of the benchmark program setting the configuration
 of the autotuner with ONLY the parameters given at the function call.
 
@@ -575,14 +575,19 @@ at the exit form this function"""
   config.__dict__ = config_defaults.__dict__.copy()                
                                                                    
   #Change the config as specified by the parameters
+  if delete_output_dir is not None:
+    config.delete_output_dir = delete_output_dir
+  
+  if max_time:
+    config.max_time = max_time  
+
   if n:
     tunerconfig.applypatch(tunerconfig.patch_n(n))
     
-  if max_time:
-    config.max_time=max_time
-
   if threads:
-    config.threads=threads
+    config.threads = threads
+  
+
     
   #Autotune                               
   res = autotune(benchmark)                                  
