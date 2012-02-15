@@ -1,8 +1,7 @@
 #!/usr/bin/python
 from configtool import ConfigFile, defaultConfigFile
 import pbutil
-import tempfile, os, math, warnings, random, sys, subprocess, time
-import shutil
+import os, math, warnings, random, subprocess
 import storagedirs
 import tunerwarnings 
 import platform
@@ -537,9 +536,16 @@ class Candidate:
     except OSError:
       pass
   
+  def maxMatrixSize(self):
+    """Return n, where (n x n) is the size of the biggest matrix the candidate 
+    was tested on"""
+    return max(self.metrics[config.timing_metric_idx].keys())
+      
   def timingResults(self, n=None):
+    """Return the running times of the candidate on (n x n) matrixes.
+    If n is not specified, the maximum available n is used"""
     if n is None:
-      n=max(self.metrics[config.timing_metric_idx].keys())
+      n=self.maxMatrixSize()
     return self.metrics[config.timing_metric_idx][n]
 
   def accuracyResults(self, n=None):
@@ -686,7 +692,7 @@ class CandidateTester:
       candidate.metrics[config.timing_metric_idx][self.n].addTimeout(limit)
       self.timeoutCount += 1
       return False
-    except pbutil.TimingRunFailed, e:
+    except pbutil.TimingRunFailed:
       self.crashCount += 1
       raise CrashException(testNumber, self.n, candidate, cmd)
 
@@ -728,7 +734,7 @@ class CandidateTester:
       candidate.metrics[config.timing_metric_idx][self.n].addTimeout(limit)
       self.timeoutCount += 1
       return False
-    except pbutil.TimingRunFailed, e:
+    except pbutil.TimingRunFailed:
       self.crashCount += 1
       raise CrashException(0, self.n, candidatea, cmd)
   

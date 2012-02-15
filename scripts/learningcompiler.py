@@ -25,19 +25,9 @@ logger = logging.getLogger(__name__)
 
 
 def compute_speedup(candidate, reference):
-    (c_dimensions, c_exec_time) = candidate
-    (r_dimensions, r_exec_time) = reference
-    
-    if c_dimensions == r_dimensions:
-        speedup = r_exec_time / c_exec_time
-        return speedup
+    (c_matrix_width, c_exec_time) = candidate
+    (r_matrix_width, r_exec_time) = reference
         
-    #Dimensions are different: compute the execution time of a single cell of 
-    #the matrix, on average. 
-    #The speedup is given relative to the time of the single cells
-    #NB: if r_dimensions==c_dimensions this formula is equal to the other one
-    r_matrix_width = 2**(r_dimensions-1)
-    c_matrix_width = 2**(c_dimensions-1)
     r_num_cells = r_matrix_width**2
     c_num_cells = c_matrix_width**2
     
@@ -63,9 +53,15 @@ following attributes:
     basename = additionalParameters["basename"]
     pbc_exe = additionalParameters["pbc_exe"]
     threads = additionalParameters["threads"]
-    max_tuning_size = additionalParameters["max_tuning_size"]
-    max_tuning_time = additionalParameters["max_tuning_time"]
-    dirnumber = count + 1
+    dirnumber = count + 1    
+
+    #The tuning has to reach the same size as the reference performance, but 
+    #it could be slower. And the reference performance could have already 
+    #reached the time limit. Therefore, allow for the double of the time limit
+    #to be safe.
+    max_tuning_size = additionalParameters["reference_performance"][0]
+    max_tuning_time = 2*additionalParameters["max_tuning_time"]
+    
     logger.info("Testing candidate %d", dirnumber)
     
     #Define more file names
@@ -92,15 +88,18 @@ following attributes:
         #file have been used, but they had the compilation fail.
         #Their score is not increased, but they are marked as used
         #(and therefore they are penalized)
-        logger.warning("Compile FAILED while using heuristic set #%d:", dirnumber)
+        logger.warning("Compile FAILED (%d) while using heuristic set #%d:", 
+                       status, dirnumber)
         logger.warning(hSet.toXmlStrings())
         return learningframework.FailedCandidate(hSet, assignScores = False)
 
 
     #Autotune
     try:
-        tuned_candidate = sgatuner.autotune_withparams(binary, n=max_tuning_size, 
-                                     max_time=max_tuning_time, threads=threads)
+        tuned_candidate = sgatuner.autotune_withparams(binary,
+                                                       n=max_tuning_size,
+                                                       max_time=max_tuning_time,
+                                                       threads=threads)
     except tunerwarnings.AlwaysCrashes:
         logger.warning("Candidate %d always crashes during tuning with hset:", 
                        dirnumber)
@@ -118,14 +117,14 @@ following attributes:
     #Return the candidate
     candidate = learningframework.SuccessfulCandidate(hSet)
 
-    numDimensions = len(tuned_candidate.metrics[0])
-    executionTime = tuned_candidate.metrics[0][2**(numDimensions-1)].mean()
+    max_size = tuned_candidate.maxMatrixSize()
+    executionTime = tuned_candidate.timingResults().mean()
     
     reference = additionalParameters["reference_performance"]
     
-    candidate.speedup = compute_speedup((numDimensions, executionTime), 
+    candidate.speedup = compute_speedup((max_size, executionTime), 
                                         reference)
-    candidate.numDimensions = numDimensions
+    candidate.max_size = max_size
     candidate.executionTime = executionTime
 
     return candidate
@@ -190,7 +189,6 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["path"] = path
     additionalParameters["pbc_exe"] = self._pbcExe
     additionalParameters["threads"] = self._threads
-    additionalParameters["max_tuning_size"] = self._n
     additionalParameters["max_tuning_time"] = self._maxTuningTime
     
     candidates = additionalParameters["candidates"]
@@ -228,17 +226,16 @@ class LearningCompiler(learningframework.Learner):
         candidates.append(default_candidate)
         
         #Store for later use by the candidates
-        numDimensions = len(tuned_candidate.metrics[0])
-        executionTime = tuned_candidate.metrics[0][2**(numDimensions-1)].mean()
+        max_size = tuned_candidate.maxMatrixSize()
+        executionTime = tuned_candidate.timingResults().mean()
         
-        additionalParameters["reference_performance"] = (
-            (numDimensions, executionTime)
-        )
+        additionalParameters["reference_performance"] = (max_size, 
+                                                         executionTime)
         
         logger.info("The reference performance with default heuristics is %s",
                     (additionalParameters["reference_performance"]))
         
-        default_candidate.numDimensions = numDimensions
+        default_candidate.max_size = max_size
         default_candidate.executionTime = executionTime
 
         
