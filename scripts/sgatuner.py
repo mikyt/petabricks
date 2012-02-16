@@ -578,11 +578,11 @@ at the exit form this function"""
   if delete_output_dir is not None:
     config.delete_output_dir = delete_output_dir
   
-  if max_time:
-    config.max_time = max_time  
-
   if n:
     tunerconfig.applypatch(tunerconfig.patch_n(n))
+
+  if max_time:
+    config.max_time = max_time
     
   if threads:
     config.threads = threads
