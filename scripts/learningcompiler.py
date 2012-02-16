@@ -8,22 +8,45 @@ import learningframework
 import os
 import pbutil_support
 import tunerwarnings
-import shutil
-import sgatuner
 import logging
 import mylogger
+import pbutil
+import sgatuner
+import shutil
+import subprocess
 
 #------------------ Config --------------------
 CONF_MAX_TIME = 60  # Seconds
 CONF_DELETE_TEMP_DIR = True
 CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
+STATIC_INPUT_PREFIX = "learning_compiler_static"
+NUM_TIMING_TESTS = 5
 #----------------------------------------------
 
 
 logger = logging.getLogger(__name__)
 
-
+def create_static_input(program, input_size):
+    cmd=[program, 
+         "--n=%s" % input_size,
+         "--iogen-create=%s" % STATIC_INPUT_PREFIX]
+        
+    print "Generating input files for the test program"
+    NULL=open("/dev/null","w")
+    logger.debug("Executing: %s" % cmd)
+    p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
+    p.wait()
+    NULL.close()
+    
+def test_with_static_input(program, trials):
+    logger.info("Executing %s %d times, with static input", program, trials)
+    res=pbutil.executeTimingRun(program, 
+                                trials=trials, 
+                                iogen_run=STATIC_INPUT_PREFIX)
+    
+    return res["average"]
+        
 def compute_speedup(candidate, reference):
     (c_matrix_width, c_exec_time) = candidate
     (r_matrix_width, r_exec_time) = reference
@@ -96,37 +119,33 @@ following attributes:
 
     #Autotune
     try:
-        tuned_candidate = sgatuner.autotune_withparams(binary,
-                                                       n=max_tuning_size,
-                                                       max_time=max_tuning_time,
-                                                       threads=threads,
-                                                       delete_output_dir=True)
+        sgatuner.autotune_withparams(binary,
+                                     n=max_tuning_size,
+                                     max_time=max_tuning_time,
+                                     threads=threads,
+                                     delete_output_dir=True)
     except tunerwarnings.AlwaysCrashes:
         logger.warning("Candidate %d always crashes during tuning with hset:", 
                        dirnumber)
         logger.warning(str(hSet))
         return learningframework.FailedCandidate(hSet, assignScores = True)
-
-
+    
     #Fetch the actually used hSet
     infoFile = os.path.join(basesubdir,
                             str(dirnumber),
                             basename+".info")
     hSet = learningframework.HeuristicSet()
     hSet.importFromXml(infoFile)
-    
-    #Return the candidate
-    candidate = learningframework.SuccessfulCandidate(hSet)
 
-    max_size = tuned_candidate.maxMatrixSize()
-    executionTime = tuned_candidate.timingResults().mean()
-    
+    max_size = max_tuning_size
+    execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)    
+    current_data = (max_size, execution_time)
     reference = additionalParameters["reference_performance"]
     
-    candidate.speedup = compute_speedup((max_size, executionTime), 
-                                        reference)
+    candidate = learningframework.SuccessfulCandidate(hSet)
     candidate.max_size = max_size
-    candidate.executionTime = executionTime
+    candidate.executionTime = execution_time
+    candidate.speedup = compute_speedup(current_data, reference)
 
     return candidate
     
@@ -212,54 +231,52 @@ class LearningCompiler(learningframework.Learner):
 
     #Autotune
     try:
-        tuned_candidate = sgatuner.autotune_withparams(binary, 
-                                                   n=self._n, 
-                                                   max_time=self._maxTuningTime,
-                                                   delete_output_dir=True)
+        sgatuner.autotune_withparams(binary, 
+                                     n=self._n, 
+                                     max_time=self._maxTuningTime,
+                                     delete_output_dir=True)
 
-        #Fetch the actually used hSet
+        #Fetch the actually used set of heuristics
         infoFile = os.path.join(outDir, basename+".info")
         h_set = learningframework.HeuristicSet()
         h_set.importFromXml(infoFile)
         
+        create_static_input(binary, self._n)
+        
+        max_size = self._n
+        execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)
+                
         default_candidate = learningframework.SuccessfulCandidate(h_set)
         default_candidate.speedup = 1 #This is the reference for the speedup
         default_candidate.originalIndex = -1
+        default_candidate.max_size = max_size
+        default_candidate.executionTime = execution_time
+       
         candidates.append(default_candidate)
         
-        #Store for later use by the candidates
-        max_size = tuned_candidate.maxMatrixSize()
-        executionTime = tuned_candidate.timingResults().mean()
-        
+        #Store for later use by the candidates        
         additionalParameters["reference_performance"] = (max_size, 
-                                                         executionTime)
+                                                         execution_time)
         
         logger.info("The reference performance with default heuristics is %s",
-                    (additionalParameters["reference_performance"]))
+                    (additionalParameters["reference_performance"]))        
         
-        default_candidate.max_size = max_size
-        default_candidate.executionTime = executionTime
-
+        #Get the full set of available features
+        self._availablefeatures = learningframework.AvailableFeatures()
+        self._availablefeatures.importFromXml(infoFile)
+    
+        #Store the list of needed heuristics for the current benchmark
+        self._neededHeuristics = []
+        for name, heur in h_set.iteritems():
+            available_features = self._get_available_features(benchmark, name)
+            neededheur = heur.derive_needed_heuristic(available_features)
+            self._neededHeuristics.append(neededheur)        
+            
+        return 0        
         
     except tunerwarnings.AlwaysCrashes:
       logger.error("Autotuning with default heuristics always crashes!")
       return -1
-
-    #Get the full set of used heuristics and available features
-    infoFile = binary+".info"
-    currentDefaultHSet = learningframework.HeuristicSet()
-    currentDefaultHSet.importFromXml(infoFile)
-    self._availablefeatures = learningframework.AvailableFeatures()
-    self._availablefeatures.importFromXml(infoFile)
-    
-    #Store the list of needed heuristics for the current benchmark
-    self._neededHeuristics = []
-    for name, heur in currentDefaultHSet.iteritems():
-        available_features = self._get_available_features(benchmark, name)
-        neededheur = heur.derive_needed_heuristic(available_features)
-        self._neededHeuristics.append(neededheur)
-
-    return 0
 
 
   def _getNeededHeuristics(self, unused_benchmark):
