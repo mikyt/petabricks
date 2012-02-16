@@ -28,6 +28,8 @@ NUM_TIMING_TESTS = 5
 logger = logging.getLogger(__name__)
 
 def create_static_input(program, input_size):
+    assert input_size > 0
+    
     cmd=[program, 
          "--n=%s" % input_size,
          "--iogen-create=%s" % STATIC_INPUT_PREFIX]
@@ -82,7 +84,7 @@ following attributes:
     #it could be slower. And the reference performance could have already 
     #reached the time limit. Therefore, allow for the double of the time limit
     #to be safe.
-    max_tuning_size = additionalParameters["reference_performance"][0]
+    max_tuning_size = additionalParameters["max_tuning_size"]
     max_tuning_time = 2*additionalParameters["max_tuning_time"]
     
     logger.info("Testing candidate %d", dirnumber)
@@ -137,10 +139,11 @@ following attributes:
     hSet = learningframework.HeuristicSet()
     hSet.importFromXml(infoFile)
 
-    max_size = max_tuning_size
+    reference = additionalParameters["reference_performance"]    
+    max_size = reference[0]
     execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)    
     current_data = (max_size, execution_time)
-    reference = additionalParameters["reference_performance"]
+    
     
     candidate = learningframework.SuccessfulCandidate(hSet)
     candidate.max_size = max_size
@@ -209,8 +212,7 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["path"] = path
     additionalParameters["pbc_exe"] = self._pbcExe
     additionalParameters["threads"] = self._threads
-    additionalParameters["max_tuning_time"] = self._maxTuningTime
-    
+    additionalParameters["max_tuning_time"] = self.maxtuningtime
     candidates = additionalParameters["candidates"]
     
     #Compile with default heuristics
@@ -231,31 +233,35 @@ class LearningCompiler(learningframework.Learner):
 
     #Autotune
     try:
-        sgatuner.autotune_withparams(binary, 
-                                     n=self._n, 
-                                     max_time=self._maxTuningTime,
-                                     delete_output_dir=True)
+        tuned_candidate = sgatuner.autotune_withparams(binary, 
+                                                   n=self._n, 
+                                                   max_time=self._maxTuningTime,
+                                                   delete_output_dir=True)
 
         #Fetch the actually used set of heuristics
         infoFile = os.path.join(outDir, basename+".info")
         h_set = learningframework.HeuristicSet()
         h_set.importFromXml(infoFile)
         
-        create_static_input(binary, self._n)
+        max_tuned_size = tuned_candidate.maxMatrixSize()
+        additionalParameters["max_tuning_size"] = max_tuned_size
         
-        max_size = self._n
+        max_test_size = self._n if self._n else max_tuned_size
+        create_static_input(binary, max_test_size)
+        
+        
         execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)
                 
         default_candidate = learningframework.SuccessfulCandidate(h_set)
         default_candidate.speedup = 1 #This is the reference for the speedup
         default_candidate.originalIndex = -1
-        default_candidate.max_size = max_size
+        default_candidate.max_size = max_test_size
         default_candidate.executionTime = execution_time
        
         candidates.append(default_candidate)
         
         #Store for later use by the candidates        
-        additionalParameters["reference_performance"] = (max_size, 
+        additionalParameters["reference_performance"] = (max_test_size, 
                                                          execution_time)
         
         logger.info("The reference performance with default heuristics is %s",
