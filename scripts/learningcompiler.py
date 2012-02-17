@@ -27,6 +27,14 @@ NUM_TIMING_TESTS = 5
 
 logger = logging.getLogger(__name__)
 
+class Error(Exception):
+    """Base exception class for this module, inherited by all the other 
+    exceptions"""
+    pass
+
+class TimingRunError(Error):
+    pass
+
 def create_static_input(program, input_size):
     assert input_size > 0
     
@@ -41,13 +49,21 @@ def create_static_input(program, input_size):
     p.wait()
     NULL.close()
     
-def test_with_static_input(program, trials):
-    logger.info("Executing %s %d times, with static input", program, trials)
-    res=pbutil.executeTimingRun(program, 
-                                trials=trials, 
-                                iogen_run=STATIC_INPUT_PREFIX)
-    
-    return res["average"]
+def test_with_static_input(program, trials, failure_retries=3):
+    try:
+        logger.info("Executing %s %d times, with static input", program, trials)
+        res=pbutil.executeTimingRun(program, 
+                                    trials=trials, 
+                                    iogen_run=STATIC_INPUT_PREFIX)
+        
+        return res["average"]
+    except pbutil.TimingRunFailed, e:
+        if failure_retries==0:
+            raise TimingRunError(e)
+        
+        return test_with_static_input(program, trials, failure_retries-1)
+        
+        
         
 def compute_speedup(candidate, reference):
     (c_matrix_width, c_exec_time) = candidate
@@ -126,31 +142,36 @@ following attributes:
                                      max_time=max_tuning_time,
                                      threads=threads,
                                      delete_output_dir=True)
+                                     
+        #Fetch the actually used hSet
+        infoFile = os.path.join(basesubdir,
+                                str(dirnumber),
+                                basename+".info")
+        hSet = learningframework.HeuristicSet()
+        hSet.importFromXml(infoFile)
+
+        reference = additionalParameters["reference_performance"]    
+        max_size = reference[0]
+        execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)    
+        current_data = (max_size, execution_time)
+        
+        
+        candidate = learningframework.SuccessfulCandidate(hSet)
+        candidate.max_size = max_size
+        candidate.executionTime = execution_time
+        candidate.speedup = compute_speedup(current_data, reference)
+
+        return candidate
+
     except tunerwarnings.AlwaysCrashes:
         logger.warning("Candidate %d always crashes during tuning with hset:", 
                        dirnumber)
         logger.warning(str(hSet))
         return learningframework.FailedCandidate(hSet, assignScores = True)
+    except TimingRunError, e:
+        logger.warning("Candidate %d failed during testing with static input:")
+        logger.exception(e)
     
-    #Fetch the actually used hSet
-    infoFile = os.path.join(basesubdir,
-                            str(dirnumber),
-                            basename+".info")
-    hSet = learningframework.HeuristicSet()
-    hSet.importFromXml(infoFile)
-
-    reference = additionalParameters["reference_performance"]    
-    max_size = reference[0]
-    execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)    
-    current_data = (max_size, execution_time)
-    
-    
-    candidate = learningframework.SuccessfulCandidate(hSet)
-    candidate.max_size = max_size
-    candidate.executionTime = execution_time
-    candidate.speedup = compute_speedup(current_data, reference)
-
-    return candidate
     
     
     
@@ -281,8 +302,14 @@ class LearningCompiler(learningframework.Learner):
         return 0        
         
     except tunerwarnings.AlwaysCrashes:
-      logger.error("Autotuning with default heuristics always crashes!")
-      return -1
+        logger.error("Autotuning with default heuristics always crashes!")
+        return -1
+    except TimingRunError, e:
+        logger.warning("Default candidate failed during testing with static "
+                       "input:")
+        logger.exception(e)
+        return -1
+    
 
 
   def _getNeededHeuristics(self, unused_benchmark):

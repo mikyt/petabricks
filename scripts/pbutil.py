@@ -421,7 +421,7 @@ def callAndWait(cmd):
   if p.returncode == -15:
     raise TimingRunTimeout()
   if p.returncode != 0:
-    raise TimingRunFailed(p.returncode)
+    raise TimingRunFailed((p.returncode, cmd))
   return p
 
 #parse timing results with a given time limit
