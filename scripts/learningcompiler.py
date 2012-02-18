@@ -171,6 +171,7 @@ following attributes:
     except TimingRunError, e:
         logger.warning("Candidate %d failed during testing with static input:")
         logger.exception(e)
+        return learningframework.FailedCandidate(hSet, assignScores = True)
     
     
     
