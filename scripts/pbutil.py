@@ -416,12 +416,12 @@ def xmlToDict(xml, tag, fn=tryIntFloat, idx=0):
 NULL=open("/dev/null", "w")
 
 def callAndWait(cmd):
-  p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=NULL)
+  p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   goodwait(p)
   if p.returncode == -15:
     raise TimingRunTimeout()
   if p.returncode != 0:
-    raise TimingRunFailed((p.returncode, cmd))
+    raise TimingRunFailed((cmd, p.returncode, p.stdout.read(), p.stderr.read()))
   return p
 
 #parse timing results with a given time limit

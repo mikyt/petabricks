@@ -35,12 +35,12 @@ class Error(Exception):
 class TimingRunError(Error):
     pass
 
-def create_static_input(program, input_size):
+def create_static_input(program, input_size, static_input_name):
     assert input_size > 0
     
     cmd=[program, 
          "--n=%s" % input_size,
-         "--iogen-create=%s" % STATIC_INPUT_PREFIX]
+         "--iogen-create=%s" % static_input_name]
         
     print "Generating input files for the test program"
     NULL=open("/dev/null","w")
@@ -49,19 +49,21 @@ def create_static_input(program, input_size):
     p.wait()
     NULL.close()
     
-def test_with_static_input(program, trials, failure_retries=3):
+def test_with_static_input(program, trials, static_input_name, 
+                           failure_retries=3):
     try:
         logger.info("Executing %s %d times, with static input", program, trials)
         res=pbutil.executeTimingRun(program, 
                                     trials=trials, 
-                                    iogen_run=STATIC_INPUT_PREFIX)
+                                    iogen_run=static_input_name)
         
         return res["average"]
     except pbutil.TimingRunFailed, e:
         if failure_retries==0:
             raise TimingRunError(e)
         
-        return test_with_static_input(program, trials, failure_retries-1)
+        return test_with_static_input(program, trials, static_input_name,
+                                      failure_retries-1)
         
         
         
@@ -94,6 +96,7 @@ following attributes:
     basename = additionalParameters["basename"]
     pbc_exe = additionalParameters["pbc_exe"]
     threads = additionalParameters["threads"]
+    static_input_name = additionalParameters["static_input_name"]
     dirnumber = count + 1    
 
     #The tuning has to reach the same size as the reference performance, but 
@@ -152,7 +155,9 @@ following attributes:
 
         reference = additionalParameters["reference_performance"]    
         max_size = reference[0]
-        execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)    
+        execution_time = test_with_static_input(binary, 
+                                                NUM_TIMING_TESTS, 
+                                                static_input_name)    
         current_data = (max_size, execution_time)
         
         
@@ -229,8 +234,11 @@ class LearningCompiler(learningframework.Learner):
       path="./"
     basename, ext = os.path.splitext(basenameExt)
     basesubdir = os.path.join(path,basename+".tmp")
+    static_input_name = os.path.join(basesubdir, STATIC_INPUT_PREFIX)
+    
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
+    additionalParameters["static_input_name"] = static_input_name
     additionalParameters["path"] = path
     additionalParameters["pbc_exe"] = self._pbcExe
     additionalParameters["threads"] = self._threads
@@ -269,10 +277,12 @@ class LearningCompiler(learningframework.Learner):
         additionalParameters["max_tuning_size"] = max_tuned_size
         
         max_test_size = self._n if self._n else max_tuned_size
-        create_static_input(binary, max_test_size)
+        create_static_input(binary, max_test_size, static_input_name)
         
         
-        execution_time = test_with_static_input(binary, NUM_TIMING_TESTS)
+        execution_time = test_with_static_input(binary, 
+                                                NUM_TIMING_TESTS,
+                                                static_input_name)
                 
         default_candidate = learningframework.SuccessfulCandidate(h_set)
         default_candidate.speedup = 1 #This is the reference for the speedup
