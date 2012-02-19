@@ -163,17 +163,17 @@ class HeuristicDB:
       return result
 
 
-  def getNMostFrequentHeuristics(self, name, N):
+  def getNMostFrequentHeuristics(self, name, N, threshold=1):
       """Returns (finalScore, heuristic) pairs, ordered by number of uses
-and then by score"""
+and then by score. The score must be greater than the given threshold"""
       cur = self.__db.cursor()
       query = ("SELECT score, formula FROM Heuristic"
                " JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID"
-               " WHERE HeuristicKind.name=?"
+               " WHERE HeuristicKind.name=? AND score>?"
                " ORDER BY Heuristic.useCount DESC,"
                "  score DESC"
                " LIMIT ?")
-      cur.execute(query, (name, N))
+      cur.execute(query, (name, threshold, N))
       result = [(row[0], row[1]) for row in cur.fetchall()]
       cur.close()
       return result
