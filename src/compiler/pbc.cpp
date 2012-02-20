@@ -259,6 +259,7 @@ void loadDefaultHeuristics() {
   
   hm.registerDefault("UserRule_blockNumber", "2");
   hm.setMin("UserRule_blockNumber", 2);
+  hm.setMax("UserRule_blockNumber", 15);
 }
 
 void findMainTransform(const TransformListPtr& t) {
