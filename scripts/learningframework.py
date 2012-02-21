@@ -510,9 +510,14 @@ class Learner(object):
                               unused_heuristic_name=None):
       return []
   
-  def __init__(self, heuristicSetFileName = None, use_mapreduce = False):
+  def __init__(self, heuristicSetFileName = None, 
+               use_mapreduce = False, 
+               min_trial_number=None):
     self._heuristicManager = HeuristicManager(heuristicSetFileName)
-    self._minTrialNumber = CONF_MIN_TRIAL_NUMBER
+    if min_trial_number:
+        self._minTrialNumber = min_trial_number
+    else:
+        self._minTrialNumber = CONF_MIN_TRIAL_NUMBER
     self._db = heuristicdb.HeuristicDB()
 
     self.use_mapreduce = use_mapreduce 

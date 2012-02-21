@@ -185,9 +185,11 @@ class LearningCompiler(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
-               maxTuningTime=CONF_MAX_TIME, use_mapreduce=True):
+               maxTuningTime=CONF_MAX_TIME, use_mapreduce=True,
+               min_trial_number=None):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
-                                           use_mapreduce=use_mapreduce)
+                                           use_mapreduce=use_mapreduce,
+                                           min_trial_number=min_trial_number)
     
     self._pbcExe = pbcExe
     self._threads = threads
@@ -407,7 +409,13 @@ if __name__ == "__main__":
     except:
         heuristics = None
         
+    try:
+        min_trial_number = sys.argv[3]
+    except:
+        min_trial_number = None
+        
     l = LearningCompiler(pbc, 
                          heuristicSetFileName = heuristics, 
-                         use_mapreduce=False)
+                         use_mapreduce=False,
+                         min_trial_number=min_trial_number)
     l.compileProgram(sys.argv[1])

@@ -69,6 +69,12 @@ def parseCmdline(petabricks_path):
                     action="store_true", 
                     dest="usemapreduce", 
                     default=False)
+  parser.add_option("--mintrialnumber",
+                    type="int",
+                    help=("minimum number of heuristics to generate for the "
+                          "learning process"),
+                    default=None)
+                          
   return parser.parse_args()
 
 
@@ -285,7 +291,8 @@ def main():
                                       n=options.maxtuningsize,
                                       maxTuningTime=options.maxtuningtime,
                                       threads = options.threads,
-                                      use_mapreduce = options.usemapreduce)
+                                      use_mapreduce = options.usemapreduce,
+                                      min_trial_number = options.mintrialnumber)
   tester = TestRunner(compiler, options.maxtestsize, options.maxtesttime)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
 
