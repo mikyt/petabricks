@@ -9,6 +9,7 @@ import pprint
 import logging
 import mincemeat
 import formula
+import os.path
 from xml.sax.saxutils import escape
 
 
@@ -34,6 +35,9 @@ class Error(Exception):
 class AllCandidatesCrashError(Error):
     pass
 
+class RuntimeGeneratedFunctionError(Error):
+    "The function was generated at runtime: it's not contained in any module"
+    pass
 
 class Candidate:
   """Represents a learning candidate. Objects can be considered candidate
@@ -287,8 +291,7 @@ class AvailableFeatures(dict):
             feature_list.append(feature_name)
         return feature_list
 
-        
-	
+
 class HeuristicSet(dict):
   """Represents a set of heuristics"""
   def __setitem__(self, key, value):
@@ -590,13 +593,13 @@ getting the current best heuristics, without modifying them"""
       
 
   def _test_with_mapreduce(self, benchmark, all_hsets, additional_parameters):
-      testfn_module = self._testHSet.__module__
-      testfn_name = self._testHSet.__name__
+      testfn_import_data = get_function_import_data(self._testHSet)
+      print testfn_import_data
       
       jobs = ({"benchmark" : benchmark,
                "hset" : hset,
                "additional_parameters" : additional_parameters,
-               "testfn" : (testfn_module, testfn_name)}
+               "testfn" : testfn_import_data}
               for hset in all_hsets )
               
       datasource = dict(enumerate(jobs))
@@ -701,3 +704,30 @@ result inside the candidates list taken from the additional parameters"""
 
   def close(self):
       self._server.close()
+
+
+    
+def get_function_module_name(function):
+    """Return the name of the module containing the given function"""
+    
+    if function.__module__ != "__main__":
+        return function.__module__
+    
+    #The function is defined inside this module itself!
+    #What's my name?
+    import __main__
+    if not hasattr(__main__, "__name__"):
+        raise RuntimeGeneratedFunctionError
+    
+    module_file_path = __main__.__file__
+    module_file_name = os.path.basename(module_file_path)
+    module_name = os.path.splitext(module_file_name)[0]
+    return module_name
+    
+        
+def get_function_import_data(function):
+    """Return the pair (module, name) representing a function"""
+    module = get_function_module_name(function)
+    name = function.__name__
+    
+    return (module, name)
