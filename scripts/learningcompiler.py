@@ -5,11 +5,12 @@ compiler
 Michele Tartara <mikyt@users.sourceforge.net>"""
 
 import learningframework
-import os
 import pbutil_support
 import tunerwarnings
 import logging
 import mylogger
+import optparse
+import os
 import pbutil
 import sgatuner
 import shutil
@@ -34,6 +35,44 @@ class Error(Exception):
 
 class TimingRunError(Error):
     pass
+
+def parseCmdline():
+    parser = optparse.OptionParser(
+        usage="usage: learningcompiler.py [options] testprogram"
+    )
+    parser.add_option("--heuristics",
+                      type="string",
+                      help="name of the file containing the set of heuristics to use",
+                      default=None)
+    parser.add_option("--errorfile",
+                        type="string",
+                        help="file containing the log of errors",
+                        default="error-log.dat")
+    parser.add_option("--maxtuningsize",
+                        type="int",
+                        help="maximum size of the input to be used tuning a candidate",
+                        default=None)
+    parser.add_option("--maxtuningtime",
+                        type="int",
+                        help="maximum time (in seconds) to be spent tuning a candidate",
+                        default=None)
+    parser.add_option("--threads",
+                        type="int",
+                        help="maximum number of threads to be used for each test",
+                        default=None)
+    parser.add_option("--usemapreduce",
+                        help=("Use the mincemeat.py library to distribute the "
+                            "computation with a mapreduce approach"),
+                        action="store_true", 
+                        dest="usemapreduce", 
+                        default=False)
+    parser.add_option("--mintrialnumber",
+                        type="int",
+                        help=("minimum number of heuristics to generate for the "
+                            "learning process"),
+                        default=None)
+                            
+    return parser.parse_args()
 
 def create_static_input(program, input_size, static_input_name):
     assert input_size > 0
@@ -185,7 +224,7 @@ class LearningCompiler(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
-               maxTuningTime=CONF_MAX_TIME, use_mapreduce=True,
+               maxTuningTime=None, use_mapreduce=True,
                min_trial_number=None):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
                                            use_mapreduce=use_mapreduce,
@@ -194,7 +233,7 @@ class LearningCompiler(learningframework.Learner):
     self._pbcExe = pbcExe
     self._threads = threads
     self._n = n
-    self._maxTuningTime = maxTuningTime
+    self.maxtuningtime = maxTuningTime
 
   @staticmethod
   def _candidateSortingKey(candidate):
@@ -216,7 +255,11 @@ class LearningCompiler(learningframework.Learner):
       return self._maxTuningTime
       
   def _setMaxTuningTime(self, maxTuningTime):
-      self._maxTuningTime = maxTuningTime
+      if maxTuningTime:
+          self._maxTuningTime = maxTuningTime
+      else:
+          self._maxTuningTime = CONF_MAX_TIME
+  
   
   maxtuningsize = property(_getMaxTuningSize, _setMaxTuningSize)
   maxtuningtime = property(_getMaxTuningTime, _setMaxTuningTime)
@@ -396,26 +439,22 @@ if __name__ == "__main__":
     petabricks_path = os.path.normpath(petabricks_path)
     examples_path= os.path.join(petabricks_path, "examples")  
     pbc = os.path.join(petabricks_path,"src/pbc")
-    errorfile = pbc + "/error-log.dat"
     
-    mylogger.configureLogging(errorfile)
+    (options, args) = parseCmdline()
     
-    if len(sys.argv)==1:
-        print "Usage: learningcompiler.py program.pbcc [heuristicSetFileName]"
+    mylogger.configureLogging(options.errorfile)
+    
+    if len(args)==0:
+        print "Usage: learningcompiler.py [options] testprogram.pbcc"
         sys.exit(1)
-        
-    try:
-        heuristics = sys.argv[2]
-    except:
-        heuristics = None
-        
-    try:
-        min_trial_number = sys.argv[3]
-    except:
-        min_trial_number = None
-        
-    l = LearningCompiler(pbc, 
-                         heuristicSetFileName = heuristics, 
-                         use_mapreduce=False,
-                         min_trial_number=min_trial_number)
-    l.compileProgram(sys.argv[1])
+                
+    l = LearningCompiler(pbc,
+                         heuristicSetFileName = options.heuristics,
+                         n=options.maxtuningsize,
+                         maxTuningTime=options.maxtuningtime,
+                         threads = options.threads,
+                         use_mapreduce = options.usemapreduce,
+                         min_trial_number = options.mintrialnumber)
+
+    program = os.path.abspath(args[0])
+    l.compileProgram(program)
