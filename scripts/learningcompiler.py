@@ -400,16 +400,20 @@ class LearningCompiler(learningframework.Learner):
       finalBin = self._finalBinary
     else:
       finalBin = os.path.join(path, basename)
+    logger.debug("Final binary: %s -> %s", bestBin, finalBin)
     shutil.move(bestBin, finalBin)
     #  .info file
     bestInfo = os.path.join(bestSubDir, basename+".info")
     finalInfo = finalBin+".info"
+    logger.debug("Moving .info")
     shutil.move(bestInfo, finalInfo)
     #  .obj directory
     bestObjDir = os.path.join(bestSubDir, basename+".obj")
     destObjDir = finalBin+".obj"
     if os.path.isdir(destObjDir):
+      logger.debug("Remove old objdir")
       shutil.rmtree(destObjDir)
+    logger.debug("Move objdir")
     shutil.move(bestObjDir, destObjDir)
     if bestIndex != 0:
         #Deal with the following files only if the executable was compiled 
@@ -418,14 +422,17 @@ class LearningCompiler(learningframework.Learner):
         #  .cfg file
         bestCfg = os.path.join(bestSubDir, basename+".cfg")
         finalCfg = finalBin + ".cfg"
+        logger.debug("Move final cfg")
         shutil.move(bestCfg, finalCfg)
         #  input heuristic file
         bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
         finalHeurFile = finalBin+".heur"
+        logger.debug("Move final heuristic file")
         shutil.move(bestHeurFile, finalHeurFile)
 
     #Delete all the rest
     if CONF_DELETE_TEMP_DIR:
+      logger.debug("Delete the temp dir")
       shutil.rmtree(basesubdir, ignore_errors=True)
 
 
@@ -458,3 +465,4 @@ if __name__ == "__main__":
 
     program = os.path.abspath(args[0])
     l.compileProgram(program)
+    l.close()
