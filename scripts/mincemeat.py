@@ -262,6 +262,7 @@ Attributes:
         
     def run(self):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.set_reuse_addr()
         try:
             self.bind(("", self.port))
             self.listen(1)
