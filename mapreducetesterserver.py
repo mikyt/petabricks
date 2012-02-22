@@ -144,7 +144,8 @@ class TestRunner(object):
             running_time = self._average_run_tests_on_limited_nodes(num_heuristics, 
                                                                     num_nodes=i,
                                                                     trials=3)
-            self.outfile.write("%d\t" % running_time)
+            self.outfile.write("%s\t" % running_time)
+            self.outfile.flush()
         
         self.outfile.write("\n")
         
@@ -157,11 +158,13 @@ class TestRunner(object):
             running_time = self._run_tests_on_limited_nodes(num_heuristics, 
                                                             num_nodes)
             total_time += running_time
+            logger.debug("Total running time: %s", total_time)
             
             #Avoid TIME_WAIT problems for TCP connections
             #time.sleep(60)
             
         average_time = total_time / trials
+        logger.debug("Average running time: %s", average_time)
         return average_time
          
          
@@ -170,15 +173,18 @@ class TestRunner(object):
             num_heuristics, num_nodes)
         
         start_time = time.time()
-        #TODO main_node = self._run_main_node(num_heuristics)
+        logger.debug("Job started at time: %s", start_time)
+        main_node = self._run_main_node(num_heuristics)
         
         for i in range(num_nodes):
             self._run_worker_node(i)
-    
-        #TODO main_node.wait()
+
+        main_node.wait()
         end_time = time.time()
+        logger.debug("Job started at time: %s", end_time)
         
         running_time = end_time - start_time
+        logger.debug("Job running time: %s", running_time)
         return running_time
         
         
@@ -197,9 +203,9 @@ class TestRunner(object):
                program]
                
         logger.debug("Running main node: %s", " ".join(cmd))
-        #TODO main_node = subprocess.Popen(cmd)
+        main_node = subprocess.Popen(cmd)
         
-        #TODO return main_node
+        return main_node
     
     
     def _run_worker_node(self,i):
