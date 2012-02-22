@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 HOST = ""
 PORT = 4242
 
-AVERAGING_TRIALS = 1
+AVERAGING_TRIALS = 3
 
 def main():
     """The body of the program"""
