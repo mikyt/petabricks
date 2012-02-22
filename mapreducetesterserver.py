@@ -15,6 +15,11 @@ import subprocess
 
 logger = logging.getLogger(__name__)
     
+HOST = ""
+PORT = 4242
+
+AVERAGING_TRIALS = 1
+
 def main():
     """The body of the program"""
 
@@ -24,8 +29,7 @@ def main():
     (options, args) = parsecmdline()
 
     configure_logging(scripts_path, options.logfile)
-    
-    HOST, PORT = "localhost", 4242
+        
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
 
     # Start a thread with the server -- that thread will then start one
@@ -44,7 +48,7 @@ def main():
     testrunner.run_tests(options.maxheurnumber)
     testrunner.close()
     
-    server.shutdown()
+    server.close()
     
     
 def configure_logging(scripts_path, errorfile):
@@ -87,15 +91,17 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.server.ready_connections.append(self)
 
     def run_worker(self):
-        command = "run_worker"
-        self.send_string(command)
+        self.send_string("run_worker")
         
     def send_string(self, string):
         self.wfile.write(string)
         self.wfile.write("\n")
+        self.wfile.flush()
         
-    def quit(self):
+    def close(self):
+        self.send_string("quit")
         self.stay_alive = False
+        
         
         
         
@@ -105,7 +111,14 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     
     def max_worker_nodes(self):
         return len(self.ready_connections)
-        
+    
+    def _terminate_clients(self):
+        for connection in self.ready_connections:
+            connection.close()
+    
+    def close(self):
+        self._terminate_clients()
+        self.shutdown()
 
         
 class TestRunner(object):
@@ -128,10 +141,10 @@ class TestRunner(object):
         
         
     def _print_result_file_header(self):
-        self.outfile.write("Heuristics_number\t")
+        self.outfile.write("#Heuristics_number\t")
         max_worker_nodes = self.server.max_worker_nodes()
-        for i in range(max_worker_nodes):
-            self.outfile.write("Worker_%s\t" % str(i+1))
+        for i in range(max_worker_nodes+1):
+            self.outfile.write("Worker_%s\t" % str(i))
         self.outfile.write("\n")
         
         
@@ -140,10 +153,9 @@ class TestRunner(object):
         self.outfile.write("%d\t" % num_heuristics)
         
         max_worker_nodes = self.server.max_worker_nodes()
-        for i in range(1, max_worker_nodes+1):
+        for i in range(max_worker_nodes+1):
             running_time = self._average_run_tests_on_limited_nodes(num_heuristics, 
-                                                                    num_nodes=i,
-                                                                    trials=3)
+                num_nodes=i, trials=AVERAGING_TRIALS)
             self.outfile.write("%s\t" % running_time)
             self.outfile.flush()
         
@@ -160,7 +172,8 @@ class TestRunner(object):
             total_time += running_time
             logger.debug("Total running time: %s", total_time)
             
-            #Avoid TIME_WAIT problems for TCP connections
+            #Avoid TIME_WAIT problems for TCP port
+            #print "Wait 60 seconds to avoid TIME_WAIT problems for TCP port"
             #time.sleep(60)
             
         average_time = total_time / trials
@@ -172,13 +185,18 @@ class TestRunner(object):
         print "Running tests on %d heuristics using %d workers" % (
             num_heuristics, num_nodes)
         
+        if num_nodes > 0:
+            usemapreduce = True
+        else:
+            usemapreduce = False
+            
         start_time = time.time()
         logger.debug("Job started at time: %s", start_time)
-        main_node = self._run_main_node(num_heuristics)
+        main_node = self._run_main_node(num_heuristics, usemapreduce)
         
-        for i in range(num_nodes):
-            self._run_worker_node(i)
-
+        if usemapreduce:
+            self._run_all_worker_nodes(num_nodes)
+        
         main_node.wait()
         end_time = time.time()
         logger.debug("Job started at time: %s", end_time)
@@ -188,7 +206,7 @@ class TestRunner(object):
         return running_time
         
         
-    def _run_main_node(self, num_heuristics):
+    def _run_main_node(self, num_heuristics, usemapreduce):
         maxtuningsize=4
         mintrialnumber=4
         threads=8
@@ -198,16 +216,26 @@ class TestRunner(object):
                "--maxtuningsize=%d" % maxtuningsize,
                "--mintrialnumber=%d" % mintrialnumber,
                "--threads=%d" % threads,
-               "--mintrialnumber=%d" % num_heuristics,
-               "--usemapreduce",
-               program]
+               "--mintrialnumber=%d" % num_heuristics]
+               
+        if usemapreduce:
+            cmd.append("--usemapreduce")
+            
+        cmd.append(program)
                
         logger.debug("Running main node: %s", " ".join(cmd))
         main_node = subprocess.Popen(cmd)
         
         return main_node
     
-    
+    def _run_all_worker_nodes(self, num_nodes):
+        #Wait for the server in the main node to be alive
+        time.sleep(10)
+        
+        for i in range(num_nodes):
+            self._run_worker_node(i)
+
+        
     def _run_worker_node(self,i):
         connection = self.server.ready_connections[i]
         
