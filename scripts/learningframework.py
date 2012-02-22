@@ -10,6 +10,7 @@ import logging
 import mincemeat
 import formula
 import os.path
+import time
 from xml.sax.saxutils import escape
 
 
@@ -33,6 +34,9 @@ class Error(Exception):
 
 
 class AllCandidatesCrashError(Error):
+    pass
+
+class MapReduceServerError(Error):
     pass
 
 class RuntimeGeneratedFunctionError(Error):
@@ -526,19 +530,42 @@ class Learner(object):
     self.use_mapreduce = use_mapreduce 
     
     if use_mapreduce:
-        self._server = mincemeat.Server()
-        self._server.mapfn = _mapfn
-        self._server.reducefn = _reducefn
-        self._server.relaunch_map = False
-        self._server.relaunch_reduce = False
-        self._server.start()
-                                       
+        self._start_server()
+                        
     hSetsFromFile = self._heuristicManager.allHeuristicSets()
     self._db.addAsFavoriteCandidates(hSetsFromFile, 10)
 
     random.seed()
 
-
+    
+  def _start_server(self, retries=10):
+      self._server = mincemeat.Server()
+      self._server.mapfn = _mapfn
+      self._server.reducefn = _reducefn
+      self._server.relaunch_map = False
+      self._server.relaunch_reduce = False
+      self._server.start()
+      while self._server.initializing():
+          #Wait for the server to be initialized
+          pass
+      
+      if not self._server.initialized:
+          #The server died without being initialized!!
+          #Maybe it just couldn't bind to its TCP port
+          logger.warning("MapReduce server initialization failed")
+          self._server.close()
+          
+          if retries == 0:
+              logger.error("Unable to start server")
+              raise MapReduceServerError
+          
+          #Wait and retry
+          logger.warning("Retrying in 10 seconds")
+          time.sleep(10)
+          self._start_server(retries-1)
+          
+      logger.info("MapReduce server initialized")
+  
   def storeCandidatesDataInDB(self, candidates):
     """Store data from all the info file, with score.
 The candidates should already be ordered (from the best one to the worst one)"""
