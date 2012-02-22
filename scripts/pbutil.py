@@ -12,11 +12,13 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 from xml.dom.minidom import parse,parseString
 from xml.dom import DOMException
 from pprint import pprint
 from configtool import getConfigVal, setConfigVal
 from learningcompiler import LearningCompiler
+from threading import Thread
 
 try:
   import numpy
@@ -60,7 +62,7 @@ def setmemlimit(n = getmemorysize()):
 
 
 def parallelRunJobs(jobs, nParallelJobs=None):
-  #outFile=open("/tmp/parallelRunJobs.txt", "w")
+  outFile=open("/tmp/parallelRunJobs.txt", "w")
   class JobInfo:
     def __init__(self, id, fn):
       self.id=id
@@ -85,15 +87,15 @@ def parallelRunJobs(jobs, nParallelJobs=None):
             self.fd=fd
           def write(self, s):
             self.fd.sendall(s)
-            #outFile.write(s)
-            #outFile.flush()
+            outFile.write(s)
+            outFile.flush()
         sys.stdout = Redir(w)
         #sys.stderr = sys.stdout
         try:
           rv = self.fn()
         except Exception, e:
-          #import traceback
-          #traceback.print_exc()
+          import traceback
+          traceback.print_exc()
           print "Exception:",e
           rv = False
         print exitval
@@ -282,8 +284,34 @@ def normalizeBenchmarkName(orig, search=True):
         return orig
       raise
 
+def killSubprocess(p):
+  if p.poll() is None:
+    try:
+      p.kill() #requires python 2.6
+    except:
+      os.kill(p.pid, signal.SIGKILL)
+      
+def terminateSubprocess(p):
+  if p.poll() is None:
+    try:
+      p.terminate() #requires python 2.6
+    except:
+      os.kill(p.pid, signal.SIGTERM)
 
-def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=None):
+      
+def timeoutKiller(subproc, timeout):
+  """Kill the 'subproc' process after 'timeout' seconds"""
+  
+  endTime = time.time()+timeout
+  
+  while (subproc.poll() is None) and (time.time() < endTime):
+      time.sleep(5)
+  
+  terminateSubprocess(subproc)
+    
+
+
+def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=None, timeout=None, defaultHeuristics=False):
     if not os.path.isfile(src):
       raise IOError()
     
@@ -298,7 +326,9 @@ def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=Non
       cmd.append("--jobs="+str(jobs))
     if heuristics is not None:
       cmd.append("--heuristics="+heuristics)
-      
+    if defaultHeuristics:
+      cmd.append("--defaultheuristics")
+    
     cmd.append(src)
     
     #Remove the output file (if it exists)
@@ -307,17 +337,28 @@ def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, heuristics=Non
       
     #Execute the compiler
     p = subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
+    
+    if timeout is not None:
+      #Start the timeout
+      killerThread = Thread(target=timeoutKiller, args=(p, timeout))
+      killerThread.start()
+    
+    #Wait for the compiler to finish executing
     status = p.wait()
+    
     return status
   
   
-def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None, noLearningList=[]):
+def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None):
   NULL=open("/dev/null","w")
   pbc="./src/pbc"
   libdepends=[pbc, "./src/libpbmain.a", "./src/libpbruntime.a", "./src/libpbcommon.a"]
   assert os.path.isfile(pbc)
   benchmarkMaxLen=0
-  jobs_per_pbc=max(1, 2*cpuCount() / len(benchmarks))
+  if learning:
+    jobs_per_pbc = cpuCount()
+  else:
+    jobs_per_pbc=max(1, 2*cpuCount() / len(benchmarks))
   compiler = LearningCompiler(pbc, heuristicSetFileName, jobs=jobs_per_pbc)
 
   def innerCompileBenchmark(name):
@@ -330,7 +371,7 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None, noL
       print "compile SKIPPED"
       return True  
     try:
-      if learning and (name not in noLearningList):
+      if learning:
         status=compiler.compileLearningHeuristics(src, finalBinary=binary)
       else:
         status=compileBenchmark(pbc, src, binary=binary, jobs=jobs_per_pbc)
@@ -342,6 +383,7 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None, noL
         return False
     except IOError:
       print "invalid benchmark"
+      traceback.print_exc()
       return False
       
       
@@ -371,7 +413,7 @@ def compileBenchmarks(benchmarks, learning=False, heuristicSetFileName=None, noL
   else:
     return parallelRunJobs(jobs)
 
-def loadAndCompileBenchmarks(file, searchterms=[], extrafn=lambda b: True, postfn=lambda b: True, learning=False, heuristicSetFileName=None, noLearningList=[]):
+def loadAndCompileBenchmarks(file, searchterms=[], extrafn=lambda b: True, postfn=lambda b: True, learning=False, heuristicSetFileName=None, excludeBenchmarks=[]):
   chdirToPetabricksRoot()
   compilePetabricks()
   benchmarks=open(file)
@@ -387,14 +429,9 @@ def loadAndCompileBenchmarks(file, searchterms=[], extrafn=lambda b: True, postf
   for b in benchmarks:
     b[0]=normalizeBenchmarkName(b[0])
 
-  return compileBenchmarks(map(lambda x: (x[0], lambda: extrafn(x), lambda: postfn(x[0])), benchmarks), learning, heuristicSetFileName, noLearningList), benchmarks
-
-def killSubprocess(p):
-  if p.poll() is None:
-    try:
-      p.kill() #requires python 2.6
-    except:
-      os.kill(p.pid, signal.SIGTERM)
+  benchmarks = filter(lambda x: x[0] not in excludeBenchmarks, benchmarks)
+  
+  return compileBenchmarks(map(lambda x: (x[0], lambda: extrafn(x), lambda: postfn(x[0])), benchmarks), learning, heuristicSetFileName), benchmarks
 
 def tryAorB(A, B):
   def tryAorBinst(x):
