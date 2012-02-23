@@ -235,6 +235,9 @@ class LearningCompiler(learningframework.Learner):
     self._n = n
     self.maxtuningtime = maxTuningTime
 
+  def close(self):
+       super(LearningCompiler, self).close()
+       
   @staticmethod
   def _candidateSortingKey(candidate):
       """Generates a comparison key for a candidate.
