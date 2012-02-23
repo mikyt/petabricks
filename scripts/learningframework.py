@@ -533,7 +533,7 @@ class Learner(object):
         self._start_server()
                         
     hSetsFromFile = self._heuristicManager.allHeuristicSets()
-    self._db.addAsFavoriteCandidates(hSetsFromFile, 10)
+    self._db.addAsFavoriteCandidates(hSetsFromFile, 2)
 
     random.seed()
 
