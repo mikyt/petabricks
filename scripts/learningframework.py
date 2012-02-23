@@ -730,7 +730,8 @@ result inside the candidates list taken from the additional parameters"""
     return 0
 
   def close(self):
-      self._server.close()
+      if hasattr(self, "_server"):
+          self._server.close()
 
 
     
