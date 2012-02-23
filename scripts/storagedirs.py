@@ -157,6 +157,20 @@ class StorageDirsTemplate:
 
 cur = None
 
+def delete_dir(directory, retries=3):
+  try:
+    shutil.rmtree(directory)
+  except:
+    #Force flush the filesystem
+    subprocess.call("sync")
+    if retries==0:
+      time.sleep(10)
+      shutil.rmtree(directory, ignore_errors=True)
+      return
+    
+    time.sleep(2)
+    delete_dir(directory, retries-1)
+
 def callWithLogDir(fn, root, delete):
   root_expanded = os.path.expanduser(root)
   if not os.path.isdir(root_expanded) and tunerconfig.config_defaults.output_dir == root:
@@ -171,7 +185,7 @@ def callWithLogDir(fn, root, delete):
     return fn()
   finally:
     if delete:
-      shutil.rmtree(d)
+	delete_dir(d)
     else:
       print d
 
