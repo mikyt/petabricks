@@ -19,7 +19,7 @@ import subprocess
 #------------------ Config --------------------
 CONF_MAX_TIME = 60  # Seconds
 CONF_DELETE_TEMP_DIR = True
-CONF_TIMEOUT = 60*30
+CONF_TIMEOUT = 60
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 STATIC_INPUT_PREFIX = "learning_compiler_static"
 NUM_TIMING_TESTS = 5
