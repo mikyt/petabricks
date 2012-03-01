@@ -38,14 +38,25 @@
 
 namespace petabricks {
 
-class HeuristicManager {
+class HeuristicManager;
+typedef jalib::JRef<HeuristicManager> HeuristicManagerPtr;
+
+class HeuristicManager : public jalib::JRefCounted {  
   public:
+  HeuristicManager(std::string db_filename="") : _db(db_filename) {};
+  
   ///Singleton instance
-  static HeuristicManager& instance() { static HeuristicManager inst;
-                                        return inst;
-                                      }
-                                              
-                                              
+  static HeuristicManager& instance() { JASSERT(_singleton_instance)
+                                            .Text("Singleton not initialized!");
+                                        return *_singleton_instance; }
+  
+  ///Init the singleton instance
+  ///
+  ///Call this once, before using the HeuristicManager                                            
+  static void init(std::string db_filename="") {
+    _singleton_instance = new HeuristicManager(db_filename);
+  }
+  
   void registerDefault(const std::string name, const std::string formula) {
           _defaultHeuristics[name] = HeuristicPtr(new Heuristic(formula));
         }
@@ -72,6 +83,7 @@ private:
   HeuristicPtr& internal_getHeuristic(const std::string name);
   
 private:
+  static HeuristicManagerPtr _singleton_instance;
   HeuristicMap _heuristicCache;
   HeuristicMap _defaultHeuristics;
   HeuristicMap _usedHeuristics;

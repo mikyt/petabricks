@@ -41,7 +41,7 @@ public:
   }
   
   ///Get the path of the default DB file
-  std::string defaultDBFileName();
+  static std::string defaultDBFileName();
   
   ///Get the best heuristic with the given name
   HeuristicPtr getBestHeuristic(std::string name);

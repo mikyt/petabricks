@@ -84,6 +84,7 @@ namespace pbcConfig {
   std::string thePbPreprocessor;
   std::string theBasename;
   std::string theHeuristicsFile;
+  std::string theKnowledgeBase;
   bool useDefaultHeuristics;
   int theNJobs = 2;
 }
@@ -314,6 +315,7 @@ int main( int argc, const char ** argv){
   args.param("jobs",       theNJobs).help("number of gcc processes to call at once");
   args.param("heuristics", theHeuristicsFile).help("config file containing the (partial) set of heuristics to use");
   args.param("defaultheuristics", useDefaultHeuristics).help("use the default heuristics for every choice");
+  args.param("knowledge", theKnowledgeBase).help("file containing the long-term learning knowledge base");
   
   if(args.param("version").help("print out version number and exit") ){
     std::cerr << PACKAGE " compiler (pbc) v" VERSION " " REVISION_LONG << std::endl;
@@ -337,13 +339,11 @@ int main( int argc, const char ** argv){
   if(theObjDir.empty())     theObjDir     = theOutputBin + ".obj";
   if(theOutputInfo.empty()) theOutputInfo = theOutputBin + ".info";
   if(theObjectFile.empty()) theObjectFile = theOutputBin + ".o";
-  if(! theHeuristicsFile.empty()) {
-    //Load the heuristics from the file
-    HeuristicManager::instance().loadFromFile(theHeuristicsFile);
-  }
-  if(useDefaultHeuristics) {
-    HeuristicManager::instance().useDefaultHeuristics(true);
-  }
+  if(theKnowledgeBase.empty()) theKnowledgeBase = DBManager::defaultDBFileName();
+  
+  HeuristicManager::init(theKnowledgeBase);
+  if(! theHeuristicsFile.empty()) HeuristicManager::instance().loadFromFile(theHeuristicsFile);
+  if(useDefaultHeuristics) HeuristicManager::instance().useDefaultHeuristics(true);
   
   loadDefaultHeuristics();
   

@@ -27,6 +27,8 @@
 #include "heuristicmanager.h"
 #include "tinyxml.h"
 
+petabricks::HeuristicManagerPtr petabricks::HeuristicManager::_singleton_instance = NULL;
+
 petabricks::HeuristicPtr& petabricks::HeuristicManager::getDefaultHeuristic(const std::string name) {
   HeuristicPtr& heuristic = internal_getDefaultHeuristic(name);
   _usedHeuristics[name] = heuristic;
