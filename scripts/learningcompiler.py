@@ -224,7 +224,7 @@ class LearningCompiler(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
-               maxTuningTime=None, use_mapreduce=True,
+               maxTuningTime=None, use_mapreduce=False,
                min_trial_number=None):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
                                            use_mapreduce=use_mapreduce,
