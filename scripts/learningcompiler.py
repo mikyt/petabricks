@@ -69,8 +69,13 @@ def parseCmdline():
     parser.add_option("--mintrialnumber",
                         type="int",
                         help=("minimum number of heuristics to generate for the "
-                            "learning process"),
+                              "learning process"),
                         default=None)
+    parser.add_option("--knowledge",
+                      type="string",
+                      help=("file containing the long-term learning knowledge "
+                            "base"),
+                      default=None)
                             
     return parser.parse_args()
 
@@ -136,6 +141,7 @@ following attributes:
     pbc_exe = additionalParameters["pbc_exe"]
     threads = additionalParameters["threads"]
     static_input_name = additionalParameters["static_input_name"]
+    knowledge = additionalParameters["knowledge"]
     dirnumber = count + 1    
 
     #The tuning has to reach the same size as the reference performance, but 
@@ -159,10 +165,11 @@ following attributes:
 
     status = pbutil_support.compileBenchmark(pbc_exe,
                                              benchmark,
-                                             binary = binary,
-                                             heuristics = heuristicsFile,
-                                             jobs = threads,
-                                             timeout = CONF_TIMEOUT)
+                                             binary=binary,
+                                             heuristics=heuristicsFile,
+                                             jobs=threads,
+                                             timeout=CONF_TIMEOUT,
+                                             knowledge=knowledge)
     if status != 0:
         #Compilation has failed!
         #Take the data about the heuristics from the input heuristics file
@@ -225,15 +232,17 @@ class LearningCompiler(learningframework.Learner):
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
                maxTuningTime=None, use_mapreduce=False,
-               min_trial_number=None):
+               min_trial_number=None, knowledge=None):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
                                            use_mapreduce=use_mapreduce,
-                                           min_trial_number=min_trial_number)
+                                           min_trial_number=min_trial_number,
+                                           knowledge=knowledge)
     
     self._pbcExe = pbcExe
     self._threads = threads
     self._n = n
     self.maxtuningtime = maxTuningTime
+    self.knowledge = knowledge
 
   def close(self):
        super(LearningCompiler, self).close()
@@ -291,6 +300,7 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["pbc_exe"] = self._pbcExe
     additionalParameters["threads"] = self._threads
     additionalParameters["max_tuning_time"] = self.maxtuningtime
+    additionalParameters["knowledge"] = self.knowledge
     candidates = additionalParameters["candidates"]
     
     #Compile with default heuristics
@@ -301,9 +311,10 @@ class LearningCompiler(learningframework.Learner):
     binary= os.path.join(outDir, basename)
     status = pbutil_support.compileBenchmark(self._pbcExe,
                                              benchmark,
-                                             binary = binary,
-                                             jobs = self._threads,
-                                             defaultHeuristics = True)
+                                             binary=binary,
+                                             jobs=self._threads,
+                                             defaultHeuristics=True,
+                                             knowledge=self.knowledge)
     if status != 0:
       logger.error("Compile FAILED with default heuristics (status: %d)- "
                    "Compilation aborted", (status))
@@ -459,12 +470,13 @@ if __name__ == "__main__":
         sys.exit(1)
                 
     l = LearningCompiler(pbc,
-                         heuristicSetFileName = options.heuristics,
+                         heuristicSetFileName=options.heuristics,
                          n=options.maxtuningsize,
                          maxTuningTime=options.maxtuningtime,
-                         threads = options.threads,
-                         use_mapreduce = options.usemapreduce,
-                         min_trial_number = options.mintrialnumber)
+                         threads=options.threads,
+                         use_mapreduce=options.usemapreduce,
+                         min_trial_number=options.mintrialnumber,
+                         knowledge=options.knowledge)
 
     program = os.path.abspath(args[0])
     l.compileProgram(program)

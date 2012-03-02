@@ -5,13 +5,14 @@ import sqlite3
 logger = logging.getLogger(__name__)
 
 class HeuristicDB:
-  def __init__(self):
-    #Open DB    
-    try:
-      self.__db = sqlite3.connect(self.computeDBPath())
-    except:
-      self.__db = sqlite3.connect(":memory:")
-    self.__createTables()
+  def __init__(self, path=None):
+      #Open DB    
+      try:
+          self.__db = sqlite3.connect(self.computeDBPath(path))
+      except:
+          self.__db = sqlite3.connect(":memory:")
+      self.__createTables()
+        
     
   def __createTable(self, name, params):
     cur = self.__db.cursor()
@@ -32,11 +33,15 @@ class HeuristicDB:
                                     "ON DELETE CASCADE ON UPDATE CASCADE)")
     #TODO:self.__createTable("InSet", "('setID' INTEGER, 'heuristicID' INTEGER)"
     
-  def computeDBPath(self):
-    #TODO: make the path more flexible
-    dbPath= os.path.expanduser("~/tunerout/knowledge.db")
-    return dbPath
+    
+  def computeDBPath(self, path):
+      if path:
+          return os.path.abspath(path)
+          
+      dbPath= os.path.expanduser("~/tunerout/knowledge.db")
+      return dbPath
 
+      
   def getHeuristicKindID(self, kindName):
     cur = self.__db.cursor()
     query = "SELECT ID From HeuristicKind WHERE name='"+kindName+"'"

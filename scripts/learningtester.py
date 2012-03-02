@@ -26,56 +26,61 @@ logger = logging.getLogger(__name__)
 
 
 def parseCmdline(petabricks_path):
-  parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
-  parser.add_option("--heuristics",
-                type="string",
-                help="name of the file containing the set of heuristics to use",
-                default=None)
-  parser.add_option("--trainingset",
-          type="string",
-          help="name of the file containing the list of programs to learn from",
-          default=os.path.join(petabricks_path, "scripts/trainingset.txt"))
-  parser.add_option("--maxtestsize",
-                    type="int",
-                    help="size of the input to generate for testing",
-                    default=256)
-  parser.add_option("--maxtesttime",
-                    type="int",
-                    help="maximum time (in seconds) to be spent tuning the test program",
-                    default=CONF_TIMEOUT)
-  parser.add_option("--resultfile",
-                    type="string",
-                    help="file containing the results in gnuplot-compatible format",
-                    default="training-results.dat")
-  parser.add_option("--errorfile",
-                    type="string",
-                    help="file containing the log of errors",
-                    default="error-log.dat")
-  parser.add_option("--maxtuningsize",
-                    type="int",
-                    help="maximum size of the input to be used tuning a candidate",
-                    default=None)
-  parser.add_option("--maxtuningtime",
-                    type="int",
-                    help="maximum time (in seconds) to be spent tuning a candidate",
-                    default=None)
-  parser.add_option("--threads",
-                    type="int",
-                    help="maximum number of threads to be used for each test",
-                    default=None)
-  parser.add_option("--usemapreduce",
-                    help=("Use the mincemeat.py library to distribute the "
-                          "computation with a mapreduce approach"),
-                    action="store_true", 
-                    dest="usemapreduce", 
-                    default=False)
-  parser.add_option("--mintrialnumber",
-                    type="int",
-                    help=("minimum number of heuristics to generate for the "
-                          "learning process"),
-                    default=None)
-                          
-  return parser.parse_args()
+    parser = OptionParser(usage="usage: learningtester.py [options] testprogram")
+    parser.add_option("--heuristics",
+                      type="string",
+                      help="name of the file containing the set of heuristics to use",
+                      default=None)
+    parser.add_option("--trainingset",
+                      type="string",
+                      help="name of the file containing the list of programs to learn from",
+                      default=os.path.join(petabricks_path, "scripts/trainingset.txt"))
+    parser.add_option("--maxtestsize",
+                      type="int",
+                      help="size of the input to generate for testing",
+                      default=256)
+    parser.add_option("--maxtesttime",
+                      type="int",
+                      help="maximum time (in seconds) to be spent tuning the test program",
+                      default=CONF_TIMEOUT)
+    parser.add_option("--resultfile",
+                      type="string",
+                      help="file containing the results in gnuplot-compatible format",
+                      default="training-results.dat")
+    parser.add_option("--errorfile",
+                      type="string",
+                      help="file containing the log of errors",
+                      default="error-log.dat")
+    parser.add_option("--maxtuningsize",
+                      type="int",
+                      help="maximum size of the input to be used tuning a candidate",
+                      default=None)
+    parser.add_option("--maxtuningtime",
+                      type="int",
+                      help="maximum time (in seconds) to be spent tuning a candidate",
+                      default=None)
+    parser.add_option("--threads",
+                      type="int",
+                      help="maximum number of threads to be used for each test",
+                      default=None)
+    parser.add_option("--usemapreduce",
+                      help=("Use the mincemeat.py library to distribute the "
+                            "computation with a mapreduce approach"),
+                      action="store_true", 
+                      dest="usemapreduce", 
+                      default=False)
+    parser.add_option("--mintrialnumber",
+                      type="int",
+                      help=("minimum number of heuristics to generate for the "
+                            "learning process"),
+                      default=None)
+    parser.add_option("--knowledge",
+                      type="string",
+                      help=("file containing the long-term learning knowledge "
+                            "base"),
+                      default=None)
+                              
+    return parser.parse_args()
 
 
 class TestRunner(object):
@@ -287,12 +292,13 @@ def main():
 
   #Create objects
   compiler = learningcompiler.LearningCompiler(pbc,
-                                      heuristicSetFileName = options.heuristics,
-                                      n=options.maxtuningsize,
-                                      maxTuningTime=options.maxtuningtime,
-                                      threads = options.threads,
-                                      use_mapreduce = options.usemapreduce,
-                                      min_trial_number = options.mintrialnumber)
+                                        heuristicSetFileName=options.heuristics,
+                                        n=options.maxtuningsize,
+                                        maxTuningTime=options.maxtuningtime,
+                                        threads=options.threads,
+                                        use_mapreduce=options.usemapreduce,
+                                        min_trial_number=options.mintrialnumber,
+                                        knowledge=options.knowledge)
   tester = TestRunner(compiler, options.maxtestsize, options.maxtesttime)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
 
