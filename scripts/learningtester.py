@@ -19,7 +19,8 @@ from optparse import OptionParser
 CONF_TIMEOUT = 5 * 60
 STATIC_INPUT_PREFIX = "test"
 HEURISTIC_KINDS = ["UserRule_blockNumber",
-                   "UnrollingOptimizer_unrollingNumber"]
+                   "UnrollingOptimizer_unrollingNumber",
+                   "OptimizationLevel"]
 MAX_PRINTED_HEURISTICS = 10
 
 logger = logging.getLogger(__name__)

@@ -659,10 +659,10 @@ result inside the candidates list taken from the additional parameters"""
 
     allHSets = []
 
-    elite = self._generateHSetsByElitism(neededHeuristics, 2, 
+    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
                                          self._db.getBestNHeuristics)
     allHSets.extend(elite)
-    elite = self._generateHSetsByElitism(neededHeuristics, 2, 
+    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
                                          self._db.getNMostFrequentHeuristics)
     allHSets.extend(elite)
     numGenerated = len(allHSets)

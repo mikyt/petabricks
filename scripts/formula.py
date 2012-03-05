@@ -127,11 +127,13 @@ def generate(available_features, resulttype, min_val=float("-inf"), max_val=floa
     """Generates a completely random formula, acknowledging the limits,
 if given"""
 
-    formula_types = [(3.5, FormulaVariable), 
-                     (3.5, _specifictype(resulttype)),
+    formula_types = [(3.5, _specifictype(resulttype)),
                      (2, FormulaBinop),
                      (1, FormulaIf)]
-    
+
+    if len(available_features) > 0:
+        formula_types.append((3.5, FormulaVariable))
+ 
     Formula = random_roulette_selection(formula_types) 
     generatedformula = Formula.generate(available_features, resulttype, min_val, max_val)
     return FormulaContainer(generatedformula)
