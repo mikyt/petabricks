@@ -37,12 +37,10 @@ void petabricks::Heuristic::recordAvailableFeatures(const ValueMap
   }
 }
 
-double petabricks::Heuristic::eval (const ValueMap featureValues) {
-  recordAvailableFeatures(featureValues);
+double petabricks::Heuristic::evalDouble (const ValueMap& featureValues) {
+  evalSideEffects(featureValues);
   
-  double value = evalWithoutLimits(featureValues);
-  
-  _uses++;
+  double value = evalWithoutLimitsDouble(featureValues);
   
   //Keep the value within the limits
   if (value < _min) {
@@ -58,15 +56,56 @@ double petabricks::Heuristic::eval (const ValueMap featureValues) {
   }
 }
 
+int petabricks::Heuristic::evalInt (const ValueMap& featureValues) {
+  evalSideEffects(featureValues);
+  
+  int value = evalWithoutLimitsInt(featureValues);
+  
+  //Keep the value within the limits
+  if (value < _min) {
+    _tooLow++;
+    return _min;
+  }
+  else if (value > _max) {
+    _tooHigh++;
+    return _max;
+  }
+  else {
+    return value;
+  }
+}
+
+bool petabricks::Heuristic::evalBool(const ValueMap& featureValues) {
+  evalSideEffects(featureValues);
+  
+  bool value = evalWithoutLimitsBool(featureValues);
+  
+  return value;
+}
+
+void petabricks::Heuristic::evalSideEffects(const ValueMap& featureValues) {
+  recordAvailableFeatures(featureValues);
+  _uses++;
+}
 
 petabricks::FormulaPtr petabricks::Heuristic::usedFormula() const { 
   if (! _formula->isConstant()) {
     return _formula;
   }
   
-  //The formula is a constant value
+  if (_type == BOOL) {
+    return _formula;
+  }
   
-  double value = evalWithoutLimits(ValueMap());
+  //The formula is a constant float or int value
+  double value;
+  if (_type == INT) {
+    value = evalWithoutLimitsInt(ValueMap());
+  }
+  else {
+    value = evalWithoutLimitsDouble(ValueMap());
+  }
+  
   if(value < _min) {
     //Return min
     return MaximaWrapper::instance().runCommandSingleOutput(jalib::XToString(_min));
@@ -79,8 +118,8 @@ petabricks::FormulaPtr petabricks::Heuristic::usedFormula() const {
   return _formula;
 }
 
-
-double petabricks::Heuristic::evalWithoutLimits (const ValueMap featureValues) const {
+petabricks::FormulaPtr petabricks::Heuristic::evalWithoutLimits_common (const ValueMap& featureValues) const {
+  JASSERT(_type != Heuristic::NONE)(_type);
   FormulaPtr evaluated = _formula->clone();
   
   for(ValueMap::const_iterator i=featureValues.begin(), e=featureValues.end();
@@ -91,12 +130,8 @@ double petabricks::Heuristic::evalWithoutLimits (const ValueMap featureValues) c
     
     evaluated = MaximaWrapper::instance().subst(featureValueStr, featureName, evaluated);
   }
-  
-  evaluated = MaximaWrapper::instance().toFloat(evaluated);
-  
-  double value = evaluated->value();
-  
-  return value;
+
+  return evaluated;
 }
 
 

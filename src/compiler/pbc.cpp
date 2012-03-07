@@ -125,22 +125,87 @@ class OutputCode {
   std::string   _gcccmd;
   FILE*         _gccfd;
 public:
-  OutputCode(const std::string& basename, CodeGenerator& o) 
+  OutputCode(const std::string& basename, 
+             CodeGenerator& o)              
     : _cpp(basename+".cpp")
     , _obj(basename+".o")
-    , _gccfd(0)
+    , _gccfd(0) {
+    
+    ValueMap empty;
+    constructor(basename, o, empty);
+  }
+
+  
+  OutputCode(const std::string& basename, 
+             CodeGenerator& o, 
+             ValueMap& features_for_flags)              
+    : _cpp(basename+".cpp")
+    , _obj(basename+".o")
+    , _gccfd(0) {
+    
+    constructor(basename, o, features_for_flags);
+  }
+  
+  void constructor(const std::string& basename, 
+                   CodeGenerator& o, 
+                   ValueMap& features_for_flags)              
   {
     _code = o.startSubfile(basename);
-
     std::ostringstream os; 
-    os << CXX " " CXXFLAGS " " CXXDEFS " -c "
+    os << CXX " " << generateCXXFLAGS(features_for_flags) << " " CXXDEFS
+       //<< flags_from_file("flags.txt")
+       << "-O" << jalib::XToString(HeuristicManager::instance().getHeuristic("OptimizationLevel")->evalInt(features_for_flags))
+       << " -c "
        << " -o "  << _obj 
        << " "     << _cpp
        << " -I\"" << theLibDir << "\""
        << " -I\"" << theRuntimeDir << "\"";
     _gcccmd = os.str();
   }
-
+  
+  std::string generateCXXFLAGS(ValueMap& features_for_flags) {
+    std::string all_flags = CXXFLAGS;
+    
+    return all_flags;  
+  }
+  
+  std::string flag(std::string flagname, ValueMap& features) {
+    HeuristicManager& hm = HeuristicManager::instance();
+    std::string heuristicName = "GCCFLAG_"+flagname;
+    std::string result="";
+    
+    
+    hm.registerDefault(heuristicName, "false", Heuristic::BOOL);
+    bool useflag = hm.getHeuristic(heuristicName)->evalBool(features);
+    
+    if (useflag) {
+      result = flagname;
+    }
+    
+    return result;
+  }
+  
+/*  std::string flags_from_file(std::string filename) {
+    std::ifstream flagfile;
+    flagfile.open(filename.c_str());
+    std::string all_flags = "";
+    
+    if (! flagfile.is_open()) {
+      JTRACE("No flag file");
+      return "";
+    }
+    
+    while( ! flagfile.eof()) {
+      std::string flag;
+      flagfile >> flag;
+      
+      all_flags += " " + flag;
+    }
+    
+    return all_flags;
+  }
+  */
+  
   void write() {
     std::ofstream of(_cpp.c_str());
     of << headertxtcpp;
@@ -258,9 +323,13 @@ public:
 void loadDefaultHeuristics() {
   HeuristicManager& hm = HeuristicManager::instance();
   
-  hm.registerDefault("UserRule_blockNumber", "2");
+  hm.registerDefault("UserRule_blockNumber", "2", Heuristic::INT);
   hm.setMin("UserRule_blockNumber", 2);
   hm.setMax("UserRule_blockNumber", 15);
+  
+  hm.registerDefault("OptimizationLevel", "0", Heuristic::INT);
+  hm.setMin("OptimizationLevel", 0);
+  hm.setMax("OptimizationLevel", 3);
 }
 
 void findMainTransform(const TransformListPtr& t) {

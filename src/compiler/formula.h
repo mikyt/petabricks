@@ -172,8 +172,10 @@ public:
   virtual char opType() const;
   
   virtual FormulaPtr clone() const = 0;
-  virtual double value() const {  JTRACE("Formula.value()")(toCppString());
-                                  UNIMPLEMENTED(); abort(); }
+  virtual double valueDouble() const {  JTRACE("Formula.value()")(toCppString());
+                                        UNIMPLEMENTED(); abort(); }
+  virtual bool valueBool() const {  JTRACE("Formula.value()")(toCppString());
+                                      UNIMPLEMENTED(); abort(); }                                
   virtual bool isConstant() const { JTRACE("Formula.isConstant()")(toCppString());
                                   UNIMPLEMENTED(); abort(); }
 protected:
@@ -232,7 +234,8 @@ public:
   FormulaLiteral(T v);
   void print(std::ostream& o) const;
   virtual FormulaPtr clone() const { return FormulaPtr(new FormulaLiteral(*this)); }
-  virtual double value() const { return _value; }
+  virtual double valueDouble() const { return _value; }
+  virtual bool valueBool() const { return _value; }
   virtual bool isConstant() const { return true; }
 private:
   T _value;
@@ -274,14 +277,15 @@ public:
     return FormulaPtr(newFormula);
   }
   
-  virtual double value() const { if(OP == '-' && (_left->value() == 0)) {
-                                   return -_right->value();
-                                 }
-                                 
-                                 //All other cases
-                                 UNIMPLEMENTED();
-                                 abort();
-                               }
+  virtual double valueDouble() const { if(OP == '-' && (_left->valueDouble() == 0)) {
+                                         return -_right->valueDouble();
+                                       }
+                                       
+                                       //All other cases
+                                       JTRACE("FormulaBinop.value()")(toCppString());
+                                       UNIMPLEMENTED();
+                                       abort();
+                                     }
                                
   virtual bool isConstant() const { return _left->isConstant() && _right->isConstant(); }
 private:

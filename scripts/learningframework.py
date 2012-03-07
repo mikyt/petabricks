@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 CONF_MIN_TRIAL_NUMBER = 16
 CONF_EXPLORATION_PROBABILITY = 0.3
 CONF_PICK_BEST_N = 10
+NUM_ELITE_BEST= 1
+NUM_ELITE_MOST_FREQUENT = 1
 #------------------------------------------
 
 def import_object(moduleName, objectName):
@@ -111,11 +113,12 @@ class SuccessfulCandidate(Candidate):
 
 
 class NeededHeuristic(object):
-    def __init__(self, name, available_features, min_val=None, max_val=None):
+    def __init__(self, name, available_features, resulttype, min_val=None, max_val=None):
         assert name is not None
         assert available_features is not None
         self.name = name
         self.available_features = available_features
+        self.resulttype = resulttype
         
         if min_val is None:
             self._min_val = float("-inf")
@@ -128,7 +131,7 @@ class NeededHeuristic(object):
             self._max_val = max_val
     
     def __repr__(self):
-        return "%s (min=%s, max=%s)" % (self.name, self.min_val, self.max_val)
+        return "%s %s (min=%s, max=%s)" % (self.resulttype, self.name, self.min_val, self.max_val)
         
         
     @property
@@ -140,15 +143,16 @@ class NeededHeuristic(object):
         return self._max_val
      
     def derive_heuristic(self, formula):
-        return Heuristic(self.name, formula, min_val=self.min_val, 
-                         max_val=self.max_val)
+        return Heuristic(self.name, formula, self.resulttype, 
+                         min_val=self.min_val, max_val=self.max_val)
         
         
 class Heuristic(object):
-  def __init__(self, name, formula, uses=None, tooLow=None, tooHigh=None, 
+  def __init__(self, name, formula, resulttype, uses=None, tooLow=None, tooHigh=None, 
                min_val=None, max_val=None):
     self._name = name
     self._formula = formula
+    self.resulttype = resulttype
 
     if (uses is None) or uses=="":
       self._uses=None
@@ -174,13 +178,14 @@ class Heuristic(object):
         self._max = float("inf")
     else:
         self._max = float(max_val)
-
      
+
   def __repr__(self):
     formula = escape(str(self._formula))
     usesPart = self._buildStringPart("uses", self._uses)
     tooLowPart = self._buildStringPart("tooLow", self._tooLow)
     tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
+    type_part = ' type="%s"' % self.resulttype
     
     if self._min == float("-inf"):
         min_part = ""
@@ -194,13 +199,14 @@ class Heuristic(object):
     
     name=self._name
     
-    return """<heuristic name="%s" formula="%s"%s%s%s%s%s />""" % (name,
-                                                                   formula,
-                                                                   usesPart,
-                                                                   tooLowPart,
-                                                                   tooHighPart,
-                                                                   min_part,
-                                                                   max_part)
+    return """<heuristic name="%s" formula="%s"%s%s%s%s%s%s />""" % (name,
+                                                                    formula,
+                                                                    usesPart,
+                                                                    tooLowPart,
+                                                                    tooHighPart,
+                                                                    min_part,
+                                                                    max_part,
+                                                                    type_part)
   
   def __eq__(self, other):
       if self._name != other._name:
@@ -221,7 +227,8 @@ class Heuristic(object):
   def generate(name, available_features, resulttype, min_val, max_val):
       newformula = formula.generate(available_features, resulttype, min_val, 
                                     max_val)
-      return Heuristic(name, str(newformula), min_val=min_val, max_val=max_val)
+      return Heuristic(name, str(newformula), resulttype, min_val=min_val, 
+                       max_val=max_val)
   
   
   def _buildStringPart(self, varName, variable):
@@ -271,7 +278,8 @@ class Heuristic(object):
 The returned object will have the name, min and max fields set to the same 
 values as the heuristic object it is invoked upon.
 Everything else will be None"""
-      return NeededHeuristic(self._name, available_features, min_val=self._min, max_val=self._max)
+      return NeededHeuristic(self._name, available_features, self.resulttype, 
+                             min_val=self._min, max_val=self._max)
       
   
 
@@ -325,17 +333,19 @@ class HeuristicSet(dict):
   def importFromXmlDOM(self, xmlDOM):
     for heuristicXML in xmlDOM.getElementsByTagName("heuristic"):
       name = heuristicXML.getAttribute("name")
-      formula = heuristicXML.getAttribute("formula")
+      formulastr = heuristicXML.getAttribute("formula")
       uses = heuristicXML.getAttribute("uses")
       tooLow = heuristicXML.getAttribute("tooLow")
       tooHigh = heuristicXML.getAttribute("tooHigh")
       minVal = heuristicXML.getAttribute("min")
       maxVal = heuristicXML.getAttribute("max")
+      resulttype_str = heuristicXML.getAttribute("type")
+      resulttype = formula.resulttype(resulttype_str)
 
       #Use the parser to validate (and to constant fold) the formula
-      formula = str(maximaparser.parse(formula))
-      self[name] = Heuristic(name, formula, uses, tooLow, tooHigh, minVal, 
-                             maxVal)
+      formulastr = str(maximaparser.parse(formulastr))
+      self[name] = Heuristic(name, formulastr, resulttype, uses, tooLow, 
+                             tooHigh, minVal, maxVal)
 
   def complete(self, neededHeuristics, db, N):
     """Complete the sets using the given db, so that it contains all the
@@ -360,7 +370,7 @@ heuristics in the database  """
           logger.debug("Not in the DB. Generate random heuristic:")
           heur = Heuristic.generate(missing_heur.name, 
                                     missing_heur.available_features,
-                                    formula.IntegerResult,
+                                    missing_heur.resulttype,
                                     missing_heur.min_val, 
                                     missing_heur.max_val)
           logger.debug(str(heur))
@@ -659,10 +669,11 @@ result inside the candidates list taken from the additional parameters"""
 
     allHSets = []
 
-    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+    elite = self._generateHSetsByElitism(neededHeuristics, NUM_ELITE_BEST, 
                                          self._db.getBestNHeuristics)
     allHSets.extend(elite)
-    elite = self._generateHSetsByElitism(neededHeuristics, 1, 
+    elite = self._generateHSetsByElitism(neededHeuristics, 
+                                         NUM_ELITE_MOST_FREQUENT, 
                                          self._db.getNMostFrequentHeuristics)
     allHSets.extend(elite)
     numGenerated = len(allHSets)

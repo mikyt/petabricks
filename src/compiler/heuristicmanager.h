@@ -57,8 +57,12 @@ class HeuristicManager : public jalib::JRefCounted {
     _singleton_instance = new HeuristicManager(db_filename);
   }
   
-  void registerDefault(const std::string name, const std::string formula) {
-          _defaultHeuristics[name] = HeuristicPtr(new Heuristic(formula));
+  void registerDefault(const std::string name, 
+                       const std::string formula, 
+                       const Heuristic::Type type) {
+          HeuristicPtr heuristic(new Heuristic(formula));
+          heuristic->setType(type);
+          _defaultHeuristics[name] = heuristic;
         }
   void loadFromFile(const std::string fileName);
   
@@ -81,6 +85,13 @@ class HeuristicManager : public jalib::JRefCounted {
 private: 
   HeuristicPtr& internal_getDefaultHeuristic(const std::string name);
   HeuristicPtr& internal_getHeuristic(const std::string name);
+  
+  Heuristic::Type getTypeFromDefault(std::string name) {
+    HeuristicPtr& defHeur(_defaultHeuristics[name]);
+    JASSERT(defHeur)("Missing default heuristics!")(name);
+    
+    return defHeur->getType();
+  }
   
 private:
   static HeuristicManagerPtr _singleton_instance;

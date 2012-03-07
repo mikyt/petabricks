@@ -70,6 +70,7 @@ petabricks::HeuristicPtr& petabricks::HeuristicManager::internal_getHeuristic(co
   found = _fromFile.find(name);
   if(found != _fromFile.end()) {
     //Found! Store in cache and return
+    found->second->setType(getTypeFromDefault(name));
     _heuristicCache[name] = found->second;
     return found->second;
   }
@@ -78,6 +79,7 @@ petabricks::HeuristicPtr& petabricks::HeuristicManager::internal_getHeuristic(co
   HeuristicPtr heuristic = _db.getBestHeuristic(name);
   if(heuristic) {
     //Found! Store in cache and return
+    heuristic->setType(getTypeFromDefault(name));
     _heuristicCache[name] = heuristic;
     return _heuristicCache[name];
   }

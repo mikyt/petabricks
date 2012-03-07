@@ -99,6 +99,10 @@ public:
     return runCommandSingleOutput("ev("+ eq->toString() + ",float)");
   }
   
+  FormulaPtr toBool(const FormulaPtr& eq) {
+    return runCommandSingleOutput("ev("+ eq->toString() + ",pred)");
+  }
+  
   FormulaPtr subst(const std::string& with, const std::string& what, const FormulaPtr& eq){
     return runCommandSingleOutput("subst("+with+", "+what+"," + eq->toString() + ")");
   }

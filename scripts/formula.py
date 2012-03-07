@@ -22,18 +22,26 @@ class NoFeatureAvailable(Error):
 class WrongResultTypeError(Error):
     pass
 
+class ClassStringPrinter(type):
+    def __repr__(self):
+        return self._class_repr
+            
 class ResultType(object):
+    __metaclass__ = ClassStringPrinter
     pass
 
 #Formula types
 class IntegerResult(ResultType):
-    pass
+    _class_repr = "int"
+    
 
 class BooleanResult(ResultType):
-    pass
+    _class_repr = "bool"
+    
 
 class FloatResult(ResultType):
-    pass
+    _class_repr = "float"
+    
 
 #Functions    
 def random_int(min_val, max_val):
@@ -122,24 +130,51 @@ def pythonize_str(formula_str):
     else:
         return formula_str
         
+
+def resulttype(resulttype_str):
+    if resulttype_str == "int":
+        return IntegerResult
+    elif resulttype_str == "double":
+        return FloatResult
+    elif resulttype_str == "bool":
+        return BooleanResult
+    else:
+        raise WrongResultTypeError(resulttype_str)    
         
 def generate(available_features, resulttype, min_val=float("-inf"), max_val=float("inf")):
     """Generates a completely random formula, acknowledging the limits,
 if given"""
 
-    formula_types = [(3.5, _specifictype(resulttype)),
+    formula_types = [(4, _specifictype(resulttype)),
                      (2, FormulaBinop),
                      (1, FormulaIf)]
 
     if len(available_features) > 0:
-        formula_types.append((3.5, FormulaVariable))
+        formula_types.append((4, FormulaVariable))
  
-    Formula = random_roulette_selection(formula_types) 
-    generatedformula = Formula.generate(available_features, resulttype, min_val, max_val)
+    FormulaT = random_roulette_selection(formula_types) 
+    generatedformula = _safe_generate(FormulaT, available_features, resulttype, min_val, max_val)
     return FormulaContainer(generatedformula)
         
-
-class FormulaContainer:
+        
+def _safe_generate(FormulaT, available_features, resulttype, min_val, max_val):
+    try:
+        gen_formula  = FormulaT.generate(available_features, 
+                                        resulttype, 
+                                        min_val, 
+                                        max_val)
+        return gen_formula
+    except RuntimeError:
+        #If we are here, formula generation exceeded maximum recursion depth
+        #Fall back on trivial case
+        gen_formula = _specifictype(resulttype).generate(available_features, 
+                                                         resulttype, 
+                                                         min_val, 
+                                                         max_val)
+        return gen_formula
+                                                  
+    
+class FormulaContainer(object):
     """This wrapper class allows to completely mutate formulas through 
 generation of new formulas or subformulas.
 

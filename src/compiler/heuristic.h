@@ -42,13 +42,21 @@ class Heuristic : public jalib::JRefCounted {
   friend class HeuristicManager;
   
 public:
+  enum Type {
+    NONE,
+    BOOL,
+    INT,
+    DOUBLE
+  };
+  
   Heuristic(const std::string formula) :
         _formula(MaximaWrapper::instance().runCommandSingleOutput(formula)),
         _min( -std::numeric_limits<double>::infinity()),
         _max( std::numeric_limits<double>::infinity()),
         _uses(0),
         _tooLow(0),
-        _tooHigh(0) {}
+        _tooHigh(0),
+        _type(NONE) {}
   
   /** Return the formula that has actually been used for this heuristic.
    * This is either the formula itself or, if it was a constant and lower than 
@@ -59,24 +67,85 @@ public:
    * than _min or higher than _max, return _min or _max respectively. 
    * As a side effect, increase the usage count of the heuristic, and, if needed
    * mark the heuristic as being evaluated out of bounds */
-  double eval (const ValueMap featureValues=ValueMap());
+  double evalDouble (const ValueMap& featureValues=ValueMap());
+  
+  /** Evaluate the heuristic using the given features. If the result is lower 
+   * than _min or higher than _max, return _min or _max respectively. 
+   * As a side effect, increase the usage count of the heuristic, and, if needed
+   * mark the heuristic as being evaluated out of bounds */
+  
+  int evalInt(const ValueMap& featureValues=ValueMap());
+  
+  /** Evaluate the heuristic using the given features, returning the 
+   * corresponding boolean result.
+   * 
+   * As a side effect, increase the usage count of the heuristic */
+  bool evalBool (const ValueMap& featureValues=ValueMap());
+  
   
   unsigned int uses() const { return _uses; }
   unsigned int tooLow() const { return _tooLow; }
   unsigned int tooHigh() const { return _tooHigh; }
   
-  double getMin() { return _min; }
-  double getMax() { return _max; }
+  double getMin() const { return _min; }
+  double getMax() const { return _max; }
+  Type getType() const { return _type; }
+  
+  std::string getTypeStr () { switch(_type) {
+                                case NONE:
+                                  return "none";
+                                case BOOL:
+                                  return "bool";
+                                case INT:
+                                  return "int";
+                                case DOUBLE:
+                                  return "double";
+                                default:
+                                  JNOTE("Should not arrive here!")(_type);
+                                  abort();
+                              }
+                            }
   
   std::set<std::string>& getFeatureSet() { return _features; }
   
 private:
   /** Eval the heuristic using the given features. Return the exact result,
    * not limited by _max and _min */
-  double evalWithoutLimits(const ValueMap featureValues) const;
+  
+  double evalWithoutLimitsDouble(const ValueMap& featureValues) const {
+                                  JASSERT(getType()== DOUBLE);
+                                  return evalWithoutLimitsNumber(featureValues);
+                                }
+    
+  int evalWithoutLimitsInt(const ValueMap& featureValues) const {
+                            JASSERT(getType() == INT);
+                            return int(evalWithoutLimitsNumber(featureValues));
+                          } 
+  
+  double evalWithoutLimitsNumber(const ValueMap& featureValues) const {
+                  FormulaPtr evaluated(evalWithoutLimits_common(featureValues));
+                  evaluated = MaximaWrapper::instance().toFloat(evaluated);
+                  double value = evaluated->valueDouble();
+                  
+                  return value;
+                }
+                 
+  bool evalWithoutLimitsBool(const ValueMap& featureValues) const {
+                  JASSERT(getType() == BOOL);
+                  FormulaPtr evaluated(evalWithoutLimits_common(featureValues));
+                  evaluated = MaximaWrapper::instance().toBool(evaluated);
+                  bool value = evaluated->valueBool();
+                  
+                  return value;
+                }
+  
+  FormulaPtr evalWithoutLimits_common(const ValueMap& featureValues) const;
+  
+  void evalSideEffects(const ValueMap& featureValues);
   
   void setMin(const double min) { _min = min; }
   void setMax(const double max) { _max = max; }
+  void setType(const Type type) { _type = type; }
   
   void recordAvailableFeatures(const ValueMap featureValues);
   
@@ -88,6 +157,7 @@ private:
   unsigned int _tooLow;
   unsigned int _tooHigh;
   std::set<std::string> _features;
+  Type _type;
 };
 
 

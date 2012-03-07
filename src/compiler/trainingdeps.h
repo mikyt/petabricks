@@ -157,6 +157,7 @@ public:
     unsigned int tooHigh = heuristic->tooHigh();
     double max = heuristic->getMax();
     double min = heuristic->getMin();
+    std::string type = heuristic->getTypeStr();
     
     _os << "  <heuristic";
     _os << " name=\"" << name << "\"";
@@ -166,6 +167,7 @@ public:
     _os << " tooLow=\"" << jalib::XToString(tooLow) << "\"";
     _os << " max=\"" << jalib::XToString(max) << "\"";
     _os << " min=\"" << jalib::XToString(min) << "\"";
+    _os << " type=\"" << type << "\"";
     _os << " />\n";
   }
   
