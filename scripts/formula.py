@@ -23,6 +23,8 @@ class WrongResultTypeError(Error):
     pass
 
 class ClassStringPrinter(type):
+    _class_repr = "ClassStringPrinter"
+    
     def __repr__(self):
         return self._class_repr
             
