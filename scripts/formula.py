@@ -41,8 +41,8 @@ class BooleanResult(ResultType):
     _class_repr = "bool"
     
 
-class FloatResult(ResultType):
-    _class_repr = "float"
+class DoubleResult(ResultType):
+    _class_repr = "double"
     
 
 #Functions    
@@ -111,7 +111,7 @@ def _specifictype(resulttype):
         return FormulaBool
     elif resulttype == IntegerResult:
         return FormulaInteger
-    elif resulttype == FloatResult:
+    elif resulttype == DoubleResult:
         return FormulaFloat
     raise WrongResultTypeError
 
@@ -137,7 +137,7 @@ def resulttype(resulttype_str):
     if resulttype_str == "int":
         return IntegerResult
     elif resulttype_str == "double":
-        return FloatResult
+        return DoubleResult
     elif resulttype_str == "bool":
         return BooleanResult
     else:
@@ -151,7 +151,8 @@ if given"""
                      (2, FormulaBinop),
                      (1, FormulaIf)]
 
-    if len(available_features) > 0:
+    if (len(available_features) > 0) and (resulttype != BooleanResult):
+        #TODO: implement support for bool variables
         formula_types.append((4, FormulaVariable))
  
     FormulaT = random_roulette_selection(formula_types) 
@@ -358,7 +359,7 @@ class FormulaFloat:
   def __init__(self, value):
     self.value=value
     self._available_features = None
-    self.resulttype = FloatResult
+    self.resulttype = DoubleResult
     
   def __repr__(self):
     return str(self.value)
@@ -407,7 +408,7 @@ class FormulaFloat:
       
   @staticmethod
   def generate(available_features, resulttype, min_val, max_val):
-      if resulttype != FloatResult:
+      if resulttype != DoubleResult:
           raise WrongResultTypeError
       
       newformula = FormulaFloat(0)
@@ -438,8 +439,8 @@ class FormulaBinop:
         self.resulttype = BooleanResult
     else:
         #Arithmetic operator
-        if left.resulttype == FloatResult or right.resulttype == FloatResult:
-            self.resulttype = FloatResult
+        if left.resulttype == DoubleResult or right.resulttype == DoubleResult:
+            self.resulttype = DoubleResult
         else:
             self.resulttype = IntegerResult
     
@@ -456,7 +457,12 @@ class FormulaBinop:
       right = pythonize_str(str(self.right))
       reprStr = "("+ left +" "+ str(op) + " " + right +")"
       
-      e=eval(reprStr)
+      try:
+          e=eval(reprStr)
+      except ZeroDivisionError:
+          #Ooop... the formula is not so good!
+          #Let's return a fallback
+          return "0"
       s=str(e)
       d=depythonize_str(s)
       return d
@@ -604,8 +610,8 @@ class FormulaIf:
         typeElse = None
         
     #Get the highest-type result type
-    if typeThen == FloatResult or typeElse == FloatResult:
-        self.resulttype = FloatResult
+    if typeThen == DoubleResult or typeElse == DoubleResult:
+        self.resulttype = DoubleResult
     elif typeThen == IntegerResult or typeThen == IntegerResult:
         self.resulttype = IntegerResult
     else:
@@ -620,11 +626,11 @@ class FormulaIf:
     elif str(self.cond) == "false":
         return str(self.elseClause)
         
-    thenPart = str(self.thenClause)
+    thenPart = "(%s)" % str(self.thenClause)
         
     if self.elseClause is not None:
       elseRepr = str(self.elseClause)
-      elsePart=" else " + elseRepr
+      elsePart=" else (%s)" % elseRepr
     else:
       elseRepr=""
       elsePart=""
@@ -633,7 +639,7 @@ class FormulaIf:
         #Both cases are equal: the if clause is useless
         return thenPart
 
-    return "if " + str(self.cond) + " then " + thenPart + elsePart
+    return "(if " + str(self.cond) + " then " + thenPart + elsePart + ")"
   
   
   def mutate(self, min_val, max_val):

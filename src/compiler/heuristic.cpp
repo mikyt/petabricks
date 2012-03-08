@@ -120,7 +120,8 @@ petabricks::FormulaPtr petabricks::Heuristic::usedFormula() const {
 
 petabricks::FormulaPtr petabricks::Heuristic::evalWithoutLimits_common (const ValueMap& featureValues) const {
   JASSERT(_type != Heuristic::NONE)(_type);
-  FormulaPtr evaluated = _formula->clone();
+  JTRACE("Evaluating formula")(_formula);
+  FormulaPtr evaluated = _formula;
   
   for(ValueMap::const_iterator i=featureValues.begin(), e=featureValues.end();
       i!=e;

@@ -5,6 +5,7 @@ compiler
 Michele Tartara <mikyt@users.sourceforge.net>"""
 
 import learningframework
+import heuristic
 import pbutil_support
 import tunerwarnings
 import logging
@@ -196,7 +197,7 @@ following attributes:
         infoFile = os.path.join(basesubdir,
                                 str(dirnumber),
                                 basename+".info")
-        hSet = learningframework.HeuristicSet()
+        hSet = heuristic.HeuristicSet()
         hSet.importFromXml(infoFile)
 
         reference = additionalParameters["reference_performance"]    
@@ -329,7 +330,7 @@ class LearningCompiler(learningframework.Learner):
 
         #Fetch the actually used set of heuristics
         infoFile = os.path.join(outDir, basename+".info")
-        h_set = learningframework.HeuristicSet()
+        h_set = heuristic.HeuristicSet()
         h_set.importFromXml(infoFile)
         
         max_tuned_size = tuned_candidate.maxMatrixSize()
@@ -359,7 +360,7 @@ class LearningCompiler(learningframework.Learner):
                     (additionalParameters["reference_performance"]))        
         
         #Get the full set of available features
-        self._availablefeatures = learningframework.AvailableFeatures()
+        self._availablefeatures = heuristic.AvailableFeatures()
         self._availablefeatures.importFromXml(infoFile)
     
         #Store the list of needed heuristics for the current benchmark

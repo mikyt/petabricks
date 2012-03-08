@@ -210,9 +210,13 @@ public:
   void print(std::ostream& o) const;
   virtual FormulaPtr clone() const { FormulaPtr newCond = _cond->clone();
                                      FormulaPtr newThen = _then->clone();
-                                     FormulaPtr newElse = _else->clone();
+                                     FormulaPtr newElse;
+                                     if (_else) { newElse = _else->clone(); }
+                                     else { newElse = FormulaPtr(); }
+                                     
                                      return FormulaPtr(new FormulaIf(newCond, newThen, newElse));
                                    }
+                                   
   virtual bool isConstant() const { return _cond->isConstant() && _then->isConstant() && _else->isConstant(); }
   
 private:
@@ -300,6 +304,7 @@ typedef FormulaBinop<'*'> FormulaMultiply;
 typedef FormulaBinop<'/'> FormulaDivide;
 typedef FormulaBinop<'^'> FormulaExponent;
 typedef FormulaBinop<'='> FormulaEQ;
+typedef FormulaBinop<'#'> FormulaNE;
 typedef FormulaBinop<'>'> FormulaGT;
 typedef FormulaBinop<'G'> FormulaGE;
 typedef FormulaBinop<'<'> FormulaLT;

@@ -165,7 +165,7 @@ public:
   
   std::string generateCXXFLAGS(ValueMap& features_for_flags) {
     std::string all_flags = CXXFLAGS;
-    all_flags += " -O0"; //TODO: remove when the minumum -On is automatically determined
+    all_flags += " -O0 "; //TODO: remove when the minumum -On is automatically determined
 
     // -O1
     all_flags += flag("-fauto-inc-dec", features_for_flags);
@@ -181,7 +181,7 @@ public:
     all_flags += flag("-fipa-pure-const", features_for_flags);
     all_flags += flag("-fipa-profile", features_for_flags);
     all_flags += flag("-fipa-reference", features_for_flags);
-    all_flags += flag("-fmerge-constant", features_for_flags);
+    all_flags += flag("-fmerge-constants", features_for_flags);
     all_flags += flag("-fsplit-wide-types", features_for_flags);
     all_flags += flag("-ftree-bit-ccp", features_for_flags);
     all_flags += flag("-ftree-builtin-call-dce", features_for_flags);
@@ -213,6 +213,7 @@ public:
     
     if (useflag) {
       result = flagname;
+      result += " ";
     }
     
     return result;

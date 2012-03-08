@@ -79,7 +79,7 @@ static void clearParserCaches(){
 
 
 %left AND OR
-%nonassoc '=' '<' '>' LE GE
+%nonassoc '=' '#' '<' '>' LE GE
 %right IF THEN ELSE
 %left '-' '+'
 %left '*' '/'
@@ -127,6 +127,7 @@ FormulaBinop: Formula '+' Formula { $$=REFALLOC(FormulaBinop<'+'>($1,$3)); }
             | Formula '*' Formula { $$=REFALLOC(FormulaBinop<'*'>($1,$3)); }
             | Formula '/' Formula { $$=REFALLOC(FormulaBinop<'/'>($1,$3)); }
             | Formula '=' Formula { $$=REFALLOC(FormulaBinop<'='>($1,$3)); }
+            | Formula '#' Formula { $$=REFALLOC(FormulaBinop<'#'>($1,$3)); }
             | Formula '<' Formula { $$=REFALLOC(FormulaBinop<'<'>($1,$3)); }
             | Formula '>' Formula { $$=REFALLOC(FormulaBinop<'>'>($1,$3)); }
             | Formula '^' Formula { $$=REFALLOC(FormulaBinop<'^'>($1,$3)); }

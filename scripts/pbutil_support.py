@@ -62,7 +62,7 @@ def compileBenchmark(pbc, src, binary=None, info=None, jobs=None,
     #Execute the compiler
     NULL=open("/dev/null", "w")
     
-    print "Executing: %s" % cmd
+    print "Executing: %s" % " ".join(cmd)
     p = subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
     
     if timeout is not None:
