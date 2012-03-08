@@ -165,6 +165,39 @@ public:
   
   std::string generateCXXFLAGS(ValueMap& features_for_flags) {
     std::string all_flags = CXXFLAGS;
+    all_flags += " -O0"; //TODO: remove when the minumum -On is automatically determined
+
+    // -O1
+    all_flags += flag("-fauto-inc-dec", features_for_flags);
+    all_flags += flag("-fcompare-elim", features_for_flags);
+    all_flags += flag("-fcprop-registers", features_for_flags);
+    all_flags += flag("-fdce", features_for_flags);
+    all_flags += flag("-fdefer-pop", features_for_flags);
+    all_flags += flag("-fdelayed-branch", features_for_flags);
+    all_flags += flag("-fdse", features_for_flags);
+    all_flags += flag("-fguess-branch-probability", features_for_flags);
+    all_flags += flag("-fif-conversion2", features_for_flags);
+    all_flags += flag("-fif-conversion", features_for_flags);
+    all_flags += flag("-fipa-pure-const", features_for_flags);
+    all_flags += flag("-fipa-profile", features_for_flags);
+    all_flags += flag("-fipa-reference", features_for_flags);
+    all_flags += flag("-fmerge-constant", features_for_flags);
+    all_flags += flag("-fsplit-wide-types", features_for_flags);
+    all_flags += flag("-ftree-bit-ccp", features_for_flags);
+    all_flags += flag("-ftree-builtin-call-dce", features_for_flags);
+    all_flags += flag("-ftree-ccp", features_for_flags);
+    all_flags += flag("-ftree-ch", features_for_flags);
+    all_flags += flag("-ftree-copyrename", features_for_flags);
+    all_flags += flag("-ftree-dce", features_for_flags);
+    all_flags += flag("-ftree-dominator-opts", features_for_flags);
+    all_flags += flag("-ftree-dse", features_for_flags);
+    all_flags += flag("-ftree-forwprop", features_for_flags);
+    all_flags += flag("-ftree-fre", features_for_flags);
+    all_flags += flag("-ftree-phiprop", features_for_flags);
+    all_flags += flag("-ftree-sra", features_for_flags);
+    all_flags += flag("-ftree-pta", features_for_flags);
+    all_flags += flag("-ftree-ter", features_for_flags);
+    all_flags += flag("-funit-at-a-time", features_for_flags);
     
     return all_flags;  
   }
