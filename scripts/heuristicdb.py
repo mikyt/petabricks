@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 class HeuristicDB:
   def __init__(self, path=None):
+      self._defer_commits = 0
+      
       #Open DB    
       try:
           self.__db = sqlite3.connect(self.computeDBPath(path))
@@ -18,7 +20,7 @@ class HeuristicDB:
     cur = self.__db.cursor()
     query = "CREATE TABLE IF NOT EXISTS '"+name+"' "+params
     cur.execute(query)
-    self.__db.commit()
+    self.commit()
     cur.close()
 
 
@@ -33,7 +35,35 @@ class HeuristicDB:
                                     "ON DELETE CASCADE ON UPDATE CASCADE)")
     #TODO:self.__createTable("InSet", "('setID' INTEGER, 'heuristicID' INTEGER)"
     
-    
+  
+  def defer_commits(self):
+      """Allows to disable the execution of commits for all the subsequent 
+      function calls until unlocked by calling undefer_commits().
+      
+      Useful for having faster execution of multiple instructions, by having
+      them in a single transaction instead of many small transactions.
+      
+      This function can be called multiple times (to avoid problems
+      when calling functions that defer commits on their own).
+      The commits will be effectively executed when undefer_commits() is called
+      a corresponding number of times."""
+      self._defer_commits = self._defer_commits + 1
+      
+  def undefer_commits(self):
+      """Reenable commits after they have been deferred.
+      
+      This function just re-enables the commit() method. It does not actually
+      perform the commit"""
+      assert self._defer_commits > 0
+      self._defer_commits = self._defer_commits - 1
+      
+  def commit(self):
+      if self._defer_commits > 0:
+          return
+          
+      self.__db.commit()
+          
+      
   def computeDBPath(self, path):
       if path:
           return os.path.abspath(path)
@@ -55,7 +85,7 @@ class HeuristicDB:
     cur = self.__db.cursor()
     query = "INSERT OR IGNORE INTO HeuristicKind ('name') VALUES ('"+kindName+"')"
     cur.execute(query)
-    self.__db.commit()
+    self.commit()
     cur.close()
     return self.getHeuristicKindID(kindName)
   
@@ -69,7 +99,7 @@ class HeuristicDB:
       #There was no such heuristic in the DB: probably it was taken from the defaults
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, ?)"
       cur.execute(query, (kindID, formula, score))
-    self.__db.commit()
+    self.commit()
     cur.close()
   
   
@@ -87,7 +117,7 @@ class HeuristicDB:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, 0)"
       cur.execute(query, (kindID, heuristic.formula))
-    self.__db.commit()
+    self.commit()
     cur.close()
     
   
@@ -111,13 +141,20 @@ class HeuristicDB:
   def markAsUsed(self, hSet, uses=None):
     """Mark a set of heuristics as used for generating a candidate executable"""
     #TODO: also store it as a set
+    self.defer_commits()
     for name, heuristic in hSet.iteritems():
       self.increaseHeuristicUseCount(heuristic, uses)
-
+    self.undefer_commits()
+    self.commit()
+      
   def updateHSetWeightedScore(self, heuristicSet, points):
-    #TODO: also store it as a set
-    for name, heuristic in heuristicSet.iteritems():
-      self.updateHeuristicWeightedScore(heuristic, points)
+      #TODO: also store it as a set
+      self.defer_commits()
+      for name, heuristic in heuristicSet.iteritems():
+        self.updateHeuristicWeightedScore(heuristic, points)
+      self.undefer_commits()
+      self.commit()
+    
     
   def updateHeuristicWeightedScore(self, heuristic, points):
     """The new score of the heuristic is given by the weighted average of the 
@@ -150,7 +187,7 @@ class HeuristicDB:
       logger.debug("The heuristic is actually new!")
       cur.execute(query, (kindID, heuristic.formula, heuristic.uses, 
                           (newScore*newValidUses)/newUses))
-    self.__db.commit()
+    self.commit()
     cur.close()
     
     
@@ -204,9 +241,13 @@ and then by score. The score must be greater than the given threshold"""
   def addAsFavoriteCandidates(self, heuristicSets, maximumScore=1):
     """Adds all the heuristics sets contained in "heuristicSets" to the 
 database, with maximum score, so that they will be selected with maximum likelihood"""
+    self.defer_commits()
     for hSet in heuristicSets:
       self.markAsUsed(hSet, 1)
       self.addToScore(hSet, maximumScore)
-      
+    self.undefer_commits()
+    self.commit()
+    
+    
   def close(self):
     self.__db.close()
