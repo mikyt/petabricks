@@ -257,7 +257,6 @@ heuristics in the database  """
 
   def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
-    assert len(all_available_features[name])  > 0
     heuristic.evolve(all_available_features[name])
 
 
