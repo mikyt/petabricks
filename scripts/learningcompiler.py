@@ -87,7 +87,7 @@ def create_static_input(program, input_size, static_input_name):
          "--n=%s" % input_size,
          "--iogen-create=%s" % static_input_name]
         
-    print "Generating input files for the test program"
+    logger.info("Generating input files for the test program")
     NULL=open("/dev/null","w")
     logger.debug("Executing: %s" % cmd)
     p=subprocess.Popen(cmd, stdout=NULL, stderr=NULL)
@@ -207,7 +207,7 @@ following attributes:
                                                 static_input_name)    
         current_data = (max_size, execution_time)
         
-        
+        logger.debug("Preparing candidate to be returned")
         candidate = learningframework.SuccessfulCandidate(hSet)
         candidate.max_size = max_size
         candidate.executionTime = execution_time
@@ -323,12 +323,13 @@ class LearningCompiler(learningframework.Learner):
 
     #Autotune
     try:
+        logger.debug("Tuning default candidate")
         tuned_candidate = sgatuner.autotune_withparams(binary, 
                                                    n=self._n, 
                                                    max_time=self._maxTuningTime,
                                                    delete_output_dir=True)
 
-        #Fetch the actually used set of heuristics
+        logger.debug("Fetch the actually used set of heuristics")
         infoFile = os.path.join(outDir, basename+".info")
         h_set = heuristic.HeuristicSet()
         h_set.importFromXml(infoFile)
@@ -336,7 +337,11 @@ class LearningCompiler(learningframework.Learner):
         max_tuned_size = tuned_candidate.maxMatrixSize()
         additionalParameters["max_tuning_size"] = max_tuned_size
         
-        max_test_size = self._n if self._n else max_tuned_size
+        if self._n:
+            max_test_size = self._n 
+        else:
+            max_test_size = max_tuned_size
+        
         create_static_input(binary, max_test_size, static_input_name)
         
         

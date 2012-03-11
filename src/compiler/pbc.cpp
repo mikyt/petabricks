@@ -153,8 +153,6 @@ public:
     _code = o.startSubfile(basename);
     std::ostringstream os; 
     os << CXX " " << generateCXXFLAGS(features_for_flags) << " " CXXDEFS
-       //<< flags_from_file("flags.txt")
-       << "-O" << jalib::XToString(HeuristicManager::instance().getHeuristic("OptimizationLevel")->evalInt(features_for_flags))
        << " -c "
        << " -o "  << _obj 
        << " "     << _cpp
@@ -218,27 +216,6 @@ public:
     
     return result;
   }
-  
-/*  std::string flags_from_file(std::string filename) {
-    std::ifstream flagfile;
-    flagfile.open(filename.c_str());
-    std::string all_flags = "";
-    
-    if (! flagfile.is_open()) {
-      JTRACE("No flag file");
-      return "";
-    }
-    
-    while( ! flagfile.eof()) {
-      std::string flag;
-      flagfile >> flag;
-      
-      all_flags += " " + flag;
-    }
-    
-    return all_flags;
-  }
-  */
   
   void write() {
     std::ofstream of(_cpp.c_str());
@@ -360,10 +337,6 @@ void loadDefaultHeuristics() {
   hm.registerDefault("UserRule_blockNumber", "2", Heuristic::INT);
   hm.setMin("UserRule_blockNumber", 2);
   hm.setMax("UserRule_blockNumber", 15);
-  
-  hm.registerDefault("OptimizationLevel", "0", Heuristic::INT);
-  hm.setMin("OptimizationLevel", 0);
-  hm.setMax("OptimizationLevel", 3);
 }
 
 void findMainTransform(const TransformListPtr& t) {

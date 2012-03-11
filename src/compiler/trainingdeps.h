@@ -151,7 +151,7 @@ public:
   }
   
   void addHeuristic(const std::string name, const HeuristicPtr& heuristic) {
-    std::string formula = heuristic->usedFormula()->toString();
+    std::string formula = heuristic->toString();
     unsigned int uses = heuristic->uses();
     unsigned int tooLow = heuristic->tooLow();
     unsigned int tooHigh = heuristic->tooHigh();

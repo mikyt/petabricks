@@ -462,7 +462,10 @@ class FormulaBinop:
       except ZeroDivisionError:
           #Ooop... the formula is not so good!
           #Let's return a fallback
+          if self.resulttype == BooleanResult:
+              return "false"          
           return "0"
+          
       s=str(e)
       d=depythonize_str(s)
       return d

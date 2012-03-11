@@ -38,7 +38,7 @@
 
 namespace petabricks {
 
-class Heuristic : public jalib::JRefCounted {
+class Heuristic : public jalib::JRefCounted, public jalib::JPrintable {
   friend class HeuristicManager;
   
 public:
@@ -108,6 +108,27 @@ public:
   
   std::set<std::string>& getFeatureSet() { return _features; }
   
+  void print(std::ostream& o) const {
+    FormulaPtr usedformula = usedFormula();
+
+    if (! usedformula->isConstant()) {
+      o << usedformula->toString();
+      return;
+    }
+    
+    if (!_type==BOOL) {
+      o << usedformula->toString();
+      return;
+    }
+
+    if (MaximaWrapper::instance().toBool(usedformula)->valueBool()) {
+      o << "true";
+      return;
+    }
+    
+    o << "false";
+  }
+  
 private:
   /** Eval the heuristic using the given features. Return the exact result,
    * not limited by _max and _min */
@@ -127,6 +148,7 @@ private:
                   evaluated = MaximaWrapper::instance().toFloat(evaluated);
                   double value = evaluated->valueDouble();
                   
+                  JTRACE("Evaluated number")(value);
                   return value;
                 }
                  
@@ -136,6 +158,7 @@ private:
                   evaluated = MaximaWrapper::instance().toBool(evaluated);
                   bool value = evaluated->valueBool();
                   
+                  JTRACE("Evaluated bool")(value);
                   return value;
                 }
   
