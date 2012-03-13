@@ -221,8 +221,13 @@ following attributes:
         logger.warning(str(hSet))
         return learningframework.FailedCandidate(hSet, assignScores = True)
     except TimingRunError, e:
-        logger.warning("Candidate %d failed during testing with static input:")
+        logger.warning("Candidate %d FAILED during testing with static input:", 
+                       dirnumber)
         logger.exception(e)
+        return learningframework.FailedCandidate(hSet, assignScores = True)
+    except sgatuner.DamagedExecutableError:
+        logger.warning("Tuning of candidate %d FAILED: compilation produced an "
+                       "executable file that cannot be run!")
         return learningframework.FailedCandidate(hSet, assignScores = True)
     
     

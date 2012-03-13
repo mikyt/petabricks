@@ -212,12 +212,12 @@ CLEANFILES = libpbcompiler_a-maximalexer.cpp libpbcompiler_a-maximaparser.cpp li
              libpbcompiler_a-pblexer.cpp libpbcompiler_a-pbparser.cpp libpbcompiler_a-pbparser.h \
              libpbcompiler_a-ruleirlexer.cpp libpbcompiler_a-ruleirparser.cpp libpbcompiler_a-ruleirparser.h \
              libpbcompiler_a-maximaparser.output libpbcompiler_a-pbparser.output libpbcompiler_a-ruleirparser.output \
-             libpbruntime_a-matrixreader.cpp compiler/O1_flags.inc
+             libpbruntime_a-matrixreader.cpp compiler/O2_flags.inc
 
-compiler/O1_flags.inc:
-	gcc -O1 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/all_flags += flag(\"\1\", features_for_flags);/" > compiler/O1_flags.inc
+compiler/O2_flags.inc:
+	gcc -O2 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/all_flags += flag(\"\1\", features_for_flags);/" > compiler/O2_flags.inc
 
-compiler/pbc.cpp: compiler/O1_flags.inc
+compiler/pbc.cpp: compiler/O2_flags.inc
 
 #copy bison headers
 maximaparser.h: libpbcompiler_a-maximaparser.h

@@ -165,8 +165,8 @@ public:
     std::string all_flags = CXXFLAGS;
     all_flags += " -O0 "; //TODO: remove when the minumum -On is automatically determined
 
-    // -O1
-    #include "O1_flags.inc"
+    // -O2
+    #include "O2_flags.inc"
 
     return all_flags;  
   }

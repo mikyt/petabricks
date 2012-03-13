@@ -22,9 +22,16 @@ import tunerwarnings
 from pprint import pprint
 import pdb
 
-class TrainingTimeout(Exception):
+class TuningError(Exception):
   pass
-  
+
+class TrainingTimeout(TuningError):
+  pass
+
+class DamagedExecutableError(TuningError):
+  #The executable is so damaged it cannot even return its name!
+  pass
+
 def check_timeout():
   if time.time() > config.end_time:
     raise TrainingTimeout()
@@ -33,7 +40,9 @@ def mainname(cmd):
   cmd.append("--name")
   p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
   cmd.pop()
-  os.waitpid(p.pid, 0)
+  (pid, retval) = os.waitpid(p.pid, 0)
+  if retval != 0:
+      raise DamagedExecutableError
   lines = p.stdout.readlines()
   return lines[-1].strip()
 
@@ -587,13 +596,12 @@ at the exit form this function"""
   if threads:
     config.threads = threads
   
-
-    
-  #Autotune                               
-  res = autotune(benchmark)                                  
-                                                                   
-  #Restore previous config parameters                              
-  config.__dict__ = old_config_dict.copy()
+  #Autotune
+  try:
+    res = autotune(benchmark)
+  finally:
+    #Restore previous config parameters                              
+    config.__dict__ = old_config_dict.copy()
   
   return res
   
