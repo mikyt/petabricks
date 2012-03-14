@@ -342,54 +342,56 @@ class LearningCompiler(learningframework.Learner):
         max_tuned_size = tuned_candidate.maxMatrixSize()
         additionalParameters["max_tuning_size"] = max_tuned_size
         
-        if self._n:
-            max_test_size = self._n 
-        else:
-            max_test_size = max_tuned_size
-        
-        create_static_input(binary, max_test_size, static_input_name)
-        
-        
-        execution_time = test_with_static_input(binary, 
-                                                NUM_TIMING_TESTS,
-                                                static_input_name)
-                
-        default_candidate = learningframework.SuccessfulCandidate(h_set)
-        default_candidate.speedup = 1 #This is the reference for the speedup
-        default_candidate.originalIndex = -1
-        default_candidate.max_size = max_test_size
-        default_candidate.executionTime = execution_time
-       
-        candidates.append(default_candidate)
-        
-        #Store for later use by the candidates        
-        additionalParameters["reference_performance"] = (max_test_size, 
-                                                         execution_time)
-        
-        logger.info("The reference performance with default heuristics is %s",
-                    (additionalParameters["reference_performance"]))        
-        
-        #Get the full set of available features
-        self._availablefeatures = heuristic.AvailableFeatures()
-        self._availablefeatures.importFromXml(infoFile)
-    
-        #Store the list of needed heuristics for the current benchmark
-        self._neededHeuristics = []
-        for name, heur in h_set.iteritems():
-            available_features = self._get_available_features(benchmark, name)
-            neededheur = heur.derive_needed_heuristic(available_features)
-            self._neededHeuristics.append(neededheur)        
-            
-        return 0        
-        
     except tunerwarnings.AlwaysCrashes:
         logger.error("Autotuning with default heuristics always crashes!")
-        return -1
+        additionalParameters["max_tuning_size"] = self._n
     except TimingRunError, e:
         logger.warning("Default candidate failed during testing with static "
                        "input:")
         logger.exception(e)
-        return -1
+        additionalParameters["max_tuning_size"] = self._n
+    
+    
+    if self._n:
+        max_test_size = self._n 
+    else:
+        max_test_size = max_tuned_size
+        
+    create_static_input(binary, max_test_size, static_input_name)
+        
+        
+    execution_time = test_with_static_input(binary, 
+                                            NUM_TIMING_TESTS,
+                                            static_input_name)
+                
+    default_candidate = learningframework.SuccessfulCandidate(h_set)
+    default_candidate.speedup = 1 #This is the reference for the speedup
+    default_candidate.originalIndex = -1
+    default_candidate.max_size = max_test_size
+    default_candidate.executionTime = execution_time
+       
+    candidates.append(default_candidate)
+        
+    #Store for later use by the candidates        
+    additionalParameters["reference_performance"] = (max_test_size, 
+                                                     execution_time)
+       
+    logger.info("The reference performance with default heuristics is %s",
+                (additionalParameters["reference_performance"]))
+        
+    #Get the full set of available features
+    self._availablefeatures = heuristic.AvailableFeatures()
+    self._availablefeatures.importFromXml(infoFile)
+    
+    #Store the list of needed heuristics for the current benchmark
+    self._neededHeuristics = []
+    for name, heur in h_set.iteritems():
+        available_features = self._get_available_features(benchmark, name)
+        neededheur = heur.derive_needed_heuristic(available_features)
+        self._neededHeuristics.append(neededheur)        
+            
+    return 0        
+        
     
 
 
