@@ -340,11 +340,7 @@ class LearningCompiler(learningframework.Learner):
     except tunerwarnings.AlwaysCrashes:
         logger.error("Autotuning with default heuristics always crashes!")
         additionalParameters["max_tuning_size"] = self._n
-    except TimingRunError, e:
-        logger.warning("Default candidate failed during testing with static "
-                       "input:")
-        logger.exception(e)
-        additionalParameters["max_tuning_size"] = self._n
+    
     
     
     if self._n:
@@ -354,45 +350,49 @@ class LearningCompiler(learningframework.Learner):
         
     create_static_input(binary, max_test_size, static_input_name)
         
-        
-    execution_time = test_with_static_input(binary, 
-                                            NUM_TIMING_TESTS,
-                                            static_input_name)
+    try:    
+        execution_time = test_with_static_input(binary, 
+                                                NUM_TIMING_TESTS,
+                                                static_input_name)
 
-    logger.debug("Fetch the actually used set of heuristics")
-    infoFile = os.path.join(outDir, basename+".info")
-    h_set = heuristic.HeuristicSet()
-    h_set.importFromXml(infoFile)
-                        
-    default_candidate = learningframework.SuccessfulCandidate(h_set)
-    default_candidate.speedup = 1 #This is the reference for the speedup
-    default_candidate.originalIndex = -1
-    default_candidate.max_size = max_test_size
-    default_candidate.executionTime = execution_time
-       
-    candidates.append(default_candidate)
+        logger.debug("Fetch the actually used set of heuristics")
+        infoFile = os.path.join(outDir, basename+".info")
+        h_set = heuristic.HeuristicSet()
+        h_set.importFromXml(infoFile)
+                            
+        default_candidate = learningframework.SuccessfulCandidate(h_set)
+        default_candidate.speedup = 1 #This is the reference for the speedup
+        default_candidate.originalIndex = -1
+        default_candidate.max_size = max_test_size
+        default_candidate.executionTime = execution_time
         
-    #Store for later use by the candidates        
-    additionalParameters["reference_performance"] = (max_test_size, 
-                                                     execution_time)
-       
-    logger.info("The reference performance with default heuristics is %s",
-                (additionalParameters["reference_performance"]))
-        
-    #Get the full set of available features
-    self._availablefeatures = heuristic.AvailableFeatures()
-    self._availablefeatures.importFromXml(infoFile)
-    
-    #Store the list of needed heuristics for the current benchmark
-    self._neededHeuristics = []
-    for name, heur in h_set.iteritems():
-        available_features = self._get_available_features(benchmark, name)
-        neededheur = heur.derive_needed_heuristic(available_features)
-        self._neededHeuristics.append(neededheur)        
+        candidates.append(default_candidate)
             
-    return 0        
+        #Store for later use by the candidates        
+        additionalParameters["reference_performance"] = (max_test_size, 
+                                                        execution_time)
         
-    
+        logger.info("The reference performance with default heuristics is %s",
+                    (additionalParameters["reference_performance"]))
+            
+        #Get the full set of available features
+        self._availablefeatures = heuristic.AvailableFeatures()
+        self._availablefeatures.importFromXml(infoFile)
+        
+        #Store the list of needed heuristics for the current benchmark
+        self._neededHeuristics = []
+        for name, heur in h_set.iteritems():
+            available_features = self._get_available_features(benchmark, name)
+            neededheur = heur.derive_needed_heuristic(available_features)
+            self._neededHeuristics.append(neededheur)        
+                
+        return 0        
+    except TimingRunError, e:
+        logger.warning("Default candidate failed during testing with static "
+                       "input:")
+        logger.exception(e)
+        additionalParameters["max_tuning_size"] = self._n
+        return -1
 
 
   def _getNeededHeuristics(self, unused_benchmark):
