@@ -336,9 +336,7 @@ class LearningCompiler(learningframework.Learner):
 
         logger.debug("Fetch the actually used set of heuristics")
         infoFile = os.path.join(outDir, basename+".info")
-        h_set = heuristic.HeuristicSet()
-        h_set.importFromXml(infoFile)
-        
+      
         max_tuned_size = tuned_candidate.maxMatrixSize()
         additionalParameters["max_tuning_size"] = max_tuned_size
         
@@ -363,7 +361,10 @@ class LearningCompiler(learningframework.Learner):
     execution_time = test_with_static_input(binary, 
                                             NUM_TIMING_TESTS,
                                             static_input_name)
-                
+
+    h_set = heuristic.HeuristicSet()
+    h_set.importFromXml(infoFile)
+                        
     default_candidate = learningframework.SuccessfulCandidate(h_set)
     default_candidate.speedup = 1 #This is the reference for the speedup
     default_candidate.originalIndex = -1
