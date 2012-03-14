@@ -333,9 +333,6 @@ class LearningCompiler(learningframework.Learner):
                                                    n=self._n, 
                                                    max_time=self._maxTuningTime,
                                                    delete_output_dir=True)
-
-        logger.debug("Fetch the actually used set of heuristics")
-        infoFile = os.path.join(outDir, basename+".info")
       
         max_tuned_size = tuned_candidate.maxMatrixSize()
         additionalParameters["max_tuning_size"] = max_tuned_size
@@ -362,6 +359,8 @@ class LearningCompiler(learningframework.Learner):
                                             NUM_TIMING_TESTS,
                                             static_input_name)
 
+    logger.debug("Fetch the actually used set of heuristics")
+    infoFile = os.path.join(outDir, basename+".info")
     h_set = heuristic.HeuristicSet()
     h_set.importFromXml(infoFile)
                         
