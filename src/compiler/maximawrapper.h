@@ -115,6 +115,22 @@ public:
     else
       return eq;
   }
+  
+  FormulaPtr subst(const std::map<std::string, double>& values, const FormulaPtr& eq) {
+    std::ostringstream substitutions;
+    substitutions << "subst([";
+    for(std::map<std::string, double>::const_iterator i=values.begin(), e=values.end(); i!=e; ++i) {
+      std::string name = i->first;
+      double value = i->second;
+      substitutions << name << "=" << value << ",";
+    }
+    //Avoid a dangling "," at the end of the string by adding a false substitution
+    substitutions << "x=x";
+    
+    substitutions << "]," << eq->toString() << ")";
+    
+    return runCommandSingleOutput(substitutions.str());
+  }
 
   FormulaPtr diff(const Formula& formula, const Formula& var){
     return runCommandSingleOutput("diff("+formula.toString()+","+var.toString()+")");

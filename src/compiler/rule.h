@@ -31,6 +31,7 @@
 #include "formula.h"
 #include "matrixdef.h"
 #include "region.h"
+#include "featurecomputer.h"
 
 #include "common/jprintable.h"
 #include "common/jrefcounted.h"
@@ -218,6 +219,9 @@ public:
   virtual RegionList getNonSelfDependentRegions() { return RegionList(); }
 
   virtual RegionList getFromRegions( ) const { return RegionList(); }
+  
+  virtual ValueMap computeFeatures(std::string prefix="") { prefix=prefix;
+                                                            return ValueMap(); }
   
 protected:
   int _id;

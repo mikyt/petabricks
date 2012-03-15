@@ -33,6 +33,7 @@
 #include "rirscope.h"
 #include "rule.h"
 #include "scheduler.h"
+#include "featurecomputer.h"
 
 #include "common/jprintable.h"
 #include "common/jrefcounted.h"
@@ -278,6 +279,8 @@ public:
   MatrixDefList getToMatrices() { return _to; }
 
   void addInitCall(const std::string& s) { _initCalls.push_back(s); }
+  
+  ValueMap computeFeatures(std::string prefix="") const;
 protected:
   static std::map<std::string, TransformPtr> theTransformMap();
 

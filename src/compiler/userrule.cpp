@@ -2088,3 +2088,7 @@ petabricks::RegionList petabricks::UserRule::getNonSelfDependentRegions() {
   
   return list;
 }
+
+petabricks::ValueMap petabricks::UserRule::computeFeatures(std::string prefix) { 
+  return get_rirnode_count_features(getBody(), prefix); 
+}

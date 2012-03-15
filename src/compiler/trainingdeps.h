@@ -151,6 +151,7 @@ public:
   }
   
   void addHeuristic(const std::string name, const HeuristicPtr& heuristic) {
+    JTRACE("Formula name")(name);
     std::string formula = heuristic->toString();
     unsigned int uses = heuristic->uses();
     unsigned int tooLow = heuristic->tooLow();

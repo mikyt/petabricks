@@ -38,6 +38,7 @@
 
 namespace petabricks {
 
+
 class Heuristic : public jalib::JRefCounted, public jalib::JPrintable {
   friend class HeuristicManager;
   
@@ -56,13 +57,20 @@ public:
         _uses(0),
         _tooLow(0),
         _tooHigh(0),
-        _type(NONE) {}
+        _type(NONE),
+        _cacheIsValid(false),
+        _isConstant(false) {}
   
   /** Return the formula that has actually been used for this heuristic.
    * This is either the formula itself or, if it was a constant and lower than 
    * _min or higher than _max, the value of _min or _max respectively */
-  FormulaPtr usedFormula() const;
-  
+  FormulaPtr usedFormula() const { if (! _usedFormula) {
+                                     return _formula;
+                                   }
+                                   
+                                   return _usedFormula; 
+                                 }
+                                    
   /** Evaluate the heuristic using the given features. If the result is lower 
    * than _min or higher than _max, return _min or _max respectively. 
    * As a side effect, increase the usage count of the heuristic, and, if needed
@@ -116,7 +124,7 @@ public:
       return;
     }
     
-    if (!_type==BOOL) {
+    if (_type!=BOOL) {
       o << usedformula->toString();
       return;
     }
@@ -130,9 +138,25 @@ public:
   }
   
 private:
+
+  union HeuristicValue {
+    double d;
+    int i;
+    bool b;
+  };
+
+  enum HighLowStatus {
+    OK,
+    LOW,
+    HIGH
+  };
+  
+  bool isInCache(const ValueMap& featureValues) const {
+    return _cacheIsValid && (_lastValueMap == featureValues);
+  }
+  
   /** Eval the heuristic using the given features. Return the exact result,
    * not limited by _max and _min */
-  
   double evalWithoutLimitsDouble(const ValueMap& featureValues) const {
                                   JASSERT(getType()== DOUBLE);
                                   return evalWithoutLimitsNumber(featureValues);
@@ -158,13 +182,26 @@ private:
                   evaluated = MaximaWrapper::instance().toBool(evaluated);
                   bool value = evaluated->valueBool();
                   
-                  JTRACE("Evaluated bool")(value);
                   return value;
                 }
   
   FormulaPtr evalWithoutLimits_common(const ValueMap& featureValues) const;
   
   void evalSideEffects(const ValueMap& featureValues);
+  
+  void countLowAndHigh() {  JASSERT(getType() == INT || getType() == DOUBLE);
+                            if (_isConstant) {
+                              return;
+                            }
+                            if (_highlowstatus == LOW) {
+                              _tooLow++;
+                            }
+                            else if (_highlowstatus == HIGH) {
+                              _tooHigh++;
+                            }
+                         }
+                                     
+  void setUsedFormula();
   
   void setMin(const double min) { _min = min; }
   void setMax(const double max) { _max = max; }
@@ -181,6 +218,14 @@ private:
   unsigned int _tooHigh;
   std::set<std::string> _features;
   Type _type;
+  FormulaPtr _usedFormula;
+  
+  //Evaluation cache
+  ValueMap _lastValueMap;
+  HeuristicValue _lastValue;
+  bool _cacheIsValid;
+  HighLowStatus _highlowstatus;
+  bool _isConstant;
 };
 
 

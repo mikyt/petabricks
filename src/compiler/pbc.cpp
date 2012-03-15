@@ -430,7 +430,8 @@ int main( int argc, const char ** argv){
   CodeGenerator o(header, NULL);
   
   for(TransformList::iterator i=t->begin(); i!=t->end(); ++i){
-    ccfiles.push_back(OutputCode((*i)->name(), o));
+    ValueMap transform_features = (*i)->computeFeatures((*i)->name());
+    ccfiles.push_back(OutputCode((*i)->name(), o, transform_features));
     (*i)->generateCode(o);
   }
 

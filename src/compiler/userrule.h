@@ -273,6 +273,8 @@ public:
   void trimDependency(DependencyDirection& dep,
                       const ChoiceDepGraphNode& from,
                       const ChoiceDepGraphNode& to);
+                      
+  virtual ValueMap computeFeatures(std::string prefix="");
   
 private:
   void computeDataDependencyVector();

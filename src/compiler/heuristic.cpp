@@ -38,101 +38,139 @@ void petabricks::Heuristic::recordAvailableFeatures(const ValueMap
 }
 
 double petabricks::Heuristic::evalDouble (const ValueMap& featureValues) {
+  if (isInCache(featureValues)) {
+    countLowAndHigh();
+    return _lastValue.d;
+  }
+  
+  //Compute
   evalSideEffects(featureValues);
   
   double value = evalWithoutLimitsDouble(featureValues);
   
   //Keep the value within the limits
   if (value < _min) {
-    _tooLow++;
-    return _min;
+    _highlowstatus = LOW;
+    value = _min;
   }
   else if (value > _max) {
-    _tooHigh++;
-    return _max;
+    _highlowstatus = HIGH;
+    value = _max;
   }
   else {
-    return value;
+    _highlowstatus = OK;
   }
+  
+  //Store in cache
+  _cacheIsValid = true;
+  _lastValueMap = featureValues;
+  _lastValue.d = value;
+  _isConstant = _formula->isConstant();
+  countLowAndHigh();
+  
+  setUsedFormula();
+  return value;
 }
 
 int petabricks::Heuristic::evalInt (const ValueMap& featureValues) {
+  if (isInCache(featureValues)) {
+    countLowAndHigh();
+    return _lastValue.i;
+  }
+  
+  //Compute
   evalSideEffects(featureValues);
   
   int value = evalWithoutLimitsInt(featureValues);
   
   //Keep the value within the limits
   if (value < _min) {
-    _tooLow++;
-    return _min;
+    _highlowstatus = LOW;
+    value = _min;
   }
   else if (value > _max) {
-    _tooHigh++;
-    return _max;
+    _highlowstatus = HIGH;
+    value = _max;
   }
   else {
-    return value;
+    _highlowstatus = OK;
   }
+  
+  //Store in cache
+  _cacheIsValid = true;
+  _lastValueMap = featureValues;
+  _lastValue.i = value;
+  _isConstant = _formula->isConstant();
+  countLowAndHigh();
+  
+  setUsedFormula();
+  return value;
 }
 
+
 bool petabricks::Heuristic::evalBool(const ValueMap& featureValues) {
+  if (isInCache(featureValues)) {
+    return _lastValue.b;
+  }
+  
+  //Compute
   evalSideEffects(featureValues);
   
   bool value = evalWithoutLimitsBool(featureValues);
   
+  //Store in cache
+  _cacheIsValid = true;
+  _lastValueMap = featureValues;
+  _lastValue.b = value;
+  _isConstant = _formula->isConstant();
+
+  setUsedFormula();
   return value;
 }
+
 
 void petabricks::Heuristic::evalSideEffects(const ValueMap& featureValues) {
   recordAvailableFeatures(featureValues);
   _uses++;
 }
 
-petabricks::FormulaPtr petabricks::Heuristic::usedFormula() const { 
+
+void petabricks::Heuristic::setUsedFormula() {
   if (! _formula->isConstant()) {
-    return _formula;
+    _usedFormula = _formula;
+    return;
   }
   
   if (_type == BOOL) {
-    return _formula;
+    _usedFormula = _formula;
+    return;
   }
   
-  //The formula is a constant float or int value
+  //The formula is a constant double or int value
   double value;
   if (_type == INT) {
-    value = evalWithoutLimitsInt(ValueMap());
+    value = _lastValue.i;
   }
   else {
-    value = evalWithoutLimitsDouble(ValueMap());
+    value = _lastValue.d;
   }
   
+  //Enforce limits
   if(value < _min) {
-    //Return min
-    return MaximaWrapper::instance().runCommandSingleOutput(jalib::XToString(_min));
+    value = _min;
   }
-  if(value > _max) {
-    //Return max
-    return MaximaWrapper::instance().runCommandSingleOutput(jalib::XToString(_max));
+  else if(value > _max) {
+    value = _max;
   }
   
-  return _formula;
+  _usedFormula = MaximaWrapper::instance().runCommandSingleOutput(jalib::XToString(value));
 }
+
 
 petabricks::FormulaPtr petabricks::Heuristic::evalWithoutLimits_common (const ValueMap& featureValues) const {
   JASSERT(_type != Heuristic::NONE)(_type);
-  JTRACE("Evaluating formula")(_formula);
-  FormulaPtr evaluated = _formula;
-  
-  for(ValueMap::const_iterator i=featureValues.begin(), e=featureValues.end();
-      i!=e;
-      ++i) {
-    const std::string& featureName=i->first;
-    const std::string featureValueStr = jalib::XToString(i->second);
     
-    evaluated = MaximaWrapper::instance().subst(featureValueStr, featureName, evaluated);
-  }
-
-  return evaluated;
+  return MaximaWrapper::instance().subst(featureValues, _formula);
 }
 
 
