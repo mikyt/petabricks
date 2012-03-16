@@ -60,10 +60,20 @@ class HeuristicManager : public jalib::JRefCounted {
   void registerDefault(const std::string name, 
                        const std::string formula, 
                        const Heuristic::Type type) {
-          HeuristicPtr heuristic(new Heuristic(formula));
-          heuristic->setType(type);
-          _defaultHeuristics[name] = heuristic;
-        }
+                                    registerDefault_common(name, formula, type);
+                                  }
+
+  void registerDefault(const std::string name, 
+                       const std::string formula, 
+                       const Heuristic::Type type,
+                       const double min,
+                       const double max) {
+                                    HeuristicPtr& h = registerDefault_common(name, formula, type);
+                                    h->setMin(min);
+                                    h->setMax(max);
+                                  }
+
+
   void loadFromFile(const std::string fileName);
   
   HeuristicPtr& getDefaultHeuristic(const std::string name);
@@ -86,6 +96,15 @@ private:
   HeuristicPtr& internal_getDefaultHeuristic(const std::string name);
   HeuristicPtr& internal_getHeuristic(const std::string name);
   
+  HeuristicPtr& registerDefault_common(const std::string name, 
+                       const std::string formula, 
+                       const Heuristic::Type type) {
+                         HeuristicPtr heuristic(new Heuristic(formula));
+                         heuristic->setType(type);
+                         _defaultHeuristics[name] = heuristic;
+                         return _defaultHeuristics[name];
+                       }
+                       
   Heuristic::Type getTypeFromDefault(std::string name) {
     HeuristicPtr& defHeur(_defaultHeuristics[name]);
     JASSERT(defHeur)("Missing default heuristics!")(name);

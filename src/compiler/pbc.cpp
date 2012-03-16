@@ -162,13 +162,37 @@ public:
   }
   
   std::string generateCXXFLAGS(ValueMap& features_for_flags) {
-    std::string all_flags = CXXFLAGS;
-    all_flags += " -O0 "; //TODO: remove when the minumum -On is automatically determined
+    HeuristicManager& hm = HeuristicManager::instance();
+    std::ostringstream all_flags;
+    all_flags << CXXFLAGS;
+    all_flags << "-O";
+    all_flags << hm.getHeuristic("OutputCode_OptimizationLevel")->evalInt(features_for_flags);
+    all_flags << " ";
 
     // -O2
-    #include "O2_flags.inc"
+    //#include "O2_flags.inc"
+    
+    all_flags << flag("-funroll-loops", features_for_flags);
+  
+    //Gcc parameters
+    all_flags << param("max-inline-insns-auto", features_for_flags);
+    all_flags << param("max-inline-insns-single", features_for_flags);
+    all_flags << param("large-function-insns", features_for_flags);
+    all_flags << param("large-function-growth", features_for_flags);
+    all_flags << param("large-unit-insns", features_for_flags);
+    all_flags << param("inline-unit-growth", features_for_flags);
+    all_flags << param("max-unroll-times", features_for_flags);
+    all_flags << param("max-unrolled-insns", features_for_flags);
 
-    return all_flags;  
+    return all_flags.str();  
+  }
+  
+  std::string param(std::string paramname, ValueMap& features) {
+      HeuristicManager& hm = HeuristicManager::instance();
+      std::string heuristicName = "GCCPARAM_"+paramname;
+      
+      int paramvalue = hm.getHeuristic(heuristicName)->evalInt(features);
+      return "--param " + paramname + "=" + jalib::XToString(paramvalue) + " ";
   }
   
   std::string flag(std::string flagname, ValueMap& features) {
@@ -302,12 +326,29 @@ public:
   }
 };
 
+namespace {
+  static inline std::string gccparamheuristicname(const std::string param) {
+    return "GCCPARAM_" + param;
+  }
+}
+
 void loadDefaultHeuristics() {
   HeuristicManager& hm = HeuristicManager::instance();
   
-  hm.registerDefault("UserRule_blockNumber", "2", Heuristic::INT);
-  hm.setMin("UserRule_blockNumber", 2);
-  hm.setMax("UserRule_blockNumber", 15);
+  hm.registerDefault("UserRule_blockNumber", "2", Heuristic::INT, 2, 15);;
+
+  hm.registerDefault("OutputCode_OptimizationLevel", "0", Heuristic::INT, 0, 3);
+  
+  hm.registerDefault("-funroll-loops", "false", Heuristic::BOOL);
+  
+  hm.registerDefault(gccparamheuristicname("max-inline-insns-auto"), "40", Heuristic::INT, 10, 100);
+  hm.registerDefault(gccparamheuristicname("max-inline-insns-single"), "400", Heuristic::INT, 100, 1000);
+  hm.registerDefault(gccparamheuristicname("large-function-insns"), "2700", Heuristic::INT, 1000, 5000);
+  hm.registerDefault(gccparamheuristicname("large-function-growth"), "100", Heuristic::INT, 10, 300);
+  hm.registerDefault(gccparamheuristicname("large-unit-insns"), "10000", Heuristic::INT, 1000, 30000);
+  hm.registerDefault(gccparamheuristicname("inline-unit-growth"), "30", Heuristic::INT, 10, 200);
+  hm.registerDefault(gccparamheuristicname("max-unroll-times"), "10", Heuristic::INT, 2, 100);
+  hm.registerDefault(gccparamheuristicname("max-unrolled-insns"), "100", Heuristic::INT, 10, 1000);
 }
 
 void findMainTransform(const TransformListPtr& t) {
@@ -430,7 +471,7 @@ int main( int argc, const char ** argv){
   CodeGenerator o(header, NULL);
   
   for(TransformList::iterator i=t->begin(); i!=t->end(); ++i){
-    ValueMap transform_features = (*i)->computeFeatures((*i)->name());
+    ValueMap transform_features = (*i)->computeFeatures("Transform");
     ccfiles.push_back(OutputCode((*i)->name(), o, transform_features));
     (*i)->generateCode(o);
   }

@@ -19,7 +19,15 @@ from optparse import OptionParser
 CONF_TIMEOUT = 5 * 60
 STATIC_INPUT_PREFIX = "test"
 HEURISTIC_KINDS = ["UserRule_blockNumber",
-                   "UnrollingOptimizer_unrollingNumber"]
+                   "UnrollingOptimizer_unrollingNumber",
+                   "GCCPARAM_max-inline-insns-auto",
+                   "GCCPARAM_max-inline-insns-single",
+                   "GCCPARAM_large-function-insns",
+                   "GCCPARAM_large-function-growth",
+                   "GCCPARAM_large-unit-insns",
+                   "GCCPARAM_inline-unit-growth",
+                   "GCCPARAM_max-unroll-times",
+                   "GCCPARAM_max-unrolled-insns"]
 MAX_PRINTED_HEURISTICS = 10
 
 logger = logging.getLogger(__name__)
