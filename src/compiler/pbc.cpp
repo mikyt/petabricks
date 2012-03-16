@@ -152,7 +152,7 @@ public:
   {
     _code = o.startSubfile(basename);
     std::ostringstream os; 
-    os << CXX " " << generateCXXFLAGS(features_for_flags) << " " CXXDEFS
+    os << CXX " " << generateCXXFLAGS(basename, features_for_flags) << " " CXXDEFS
        << " -c "
        << " -o "  << _obj 
        << " "     << _cpp
@@ -161,7 +161,7 @@ public:
     _gcccmd = os.str();
   }
   
-  std::string generateCXXFLAGS(ValueMap& features_for_flags) {
+  std::string generateCXXFLAGS(std::string prefix, ValueMap& features_for_flags) {
     std::string all_flags = CXXFLAGS;
     all_flags += " -O0 "; //TODO: remove when the minumum -On is automatically determined
 
@@ -171,9 +171,9 @@ public:
     return all_flags;  
   }
   
-  std::string flag(std::string flagname, ValueMap& features) {
+  std::string flag(std::string prefix, std::string flagname, ValueMap& features) {
     HeuristicManager& hm = HeuristicManager::instance();
-    std::string heuristicName = "GCCFLAG_"+flagname;
+    std::string heuristicName = prefix+"_GCCFLAG_"+flagname;
     std::string result="";
     
     
