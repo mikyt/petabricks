@@ -227,7 +227,7 @@ following attributes:
         return learningframework.FailedCandidate(hSet, assignScores = True)
     except sgatuner.DamagedExecutableError:
         logger.warning("Tuning of candidate %d FAILED: compilation produced an "
-                       "executable file that cannot be run!")
+                       "executable file that cannot be run!", dirnumber)
         return learningframework.FailedCandidate(hSet, assignScores = True)
     
     
