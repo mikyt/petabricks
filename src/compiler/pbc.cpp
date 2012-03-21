@@ -166,11 +166,12 @@ public:
     std::ostringstream all_flags;
     all_flags << CXXFLAGS;
     all_flags << "-O";
-    all_flags << hm.getHeuristic("OutputCode_OptimizationLevel")->evalInt(features_for_flags);
+    //all_flags << hm.getHeuristic("OutputCode_OptimizationLevel")->evalInt(features_for_flags);
+    all_flags << "0";
     all_flags << " ";
 
     // -O2
-    //#include "O2_flags.inc"
+    #include "O2_flags.inc"
     
     all_flags << flag("-funroll-loops", features_for_flags);
   

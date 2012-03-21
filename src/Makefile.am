@@ -215,7 +215,7 @@ CLEANFILES = libpbcompiler_a-maximalexer.cpp libpbcompiler_a-maximaparser.cpp li
              libpbruntime_a-matrixreader.cpp compiler/O2_flags.inc
 
 compiler/O2_flags.inc:
-	gcc -O2 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/all_flags += flag(\"\1\", features_for_flags);/" > compiler/O2_flags.inc
+	gcc -O2 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/all_flags << flag(\"\1\", features_for_flags);/" > compiler/O2_flags.inc
 
 compiler/pbc.cpp: compiler/O2_flags.inc
 

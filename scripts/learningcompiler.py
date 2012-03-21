@@ -181,7 +181,7 @@ following attributes:
         #(and therefore they are penalized)
         logger.warning("Compile FAILED (%d) while using heuristic set #%d:", 
                        status, dirnumber)
-        logger.warning(hSet.toXmlStrings())
+        logger.warning(hSet)
         return learningframework.FailedCandidate(hSet, assignScores = False)
 
 

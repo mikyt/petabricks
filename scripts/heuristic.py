@@ -177,17 +177,22 @@ class HeuristicSet(dict):
       raise TypeError
     super(HeuristicSet, self).__setitem__(key, value)
 
-  def toXmlStrings(self):
+  def __repr__(self):
+      return self.toXmlString()
+
+  def toXmlStringList(self):
     return [str(self[name]) for name in self]
 
+  def toXmlString(self):
+       outlist = []
+       outlist.append("<set>")
+       outlist.extend(["\t"+ s for s in self.toXmlStringList()])
+       outlist.append("</set>\n")
+       return "\n".join(outlist)
+    
   def toXmlFile(self, filename):
     outfile = open(filename, "w")
-    outfile.write("<set>\n")
-    for xmlstring in self.toXmlStrings():
-      outfile.write("\t")
-      outfile.write(xmlstring)
-      outfile.write("\n")
-    outfile.write("</set>\n")
+    outfile.write(self.toXmlString())
     outfile.close()
 
   def importFromXmlString(self, xmlString):
