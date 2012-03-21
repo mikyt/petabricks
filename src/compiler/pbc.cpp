@@ -28,6 +28,7 @@
 #include "codegenerator.h"
 #include "maximawrapper.h"
 #include "transform.h"
+#include "featurecomputer.h"
 
 #include "common/hash.h"
 #include "common/jargs.h"
@@ -126,12 +127,13 @@ class OutputCode {
   FILE*         _gccfd;
 public:
   OutputCode(const std::string& basename, 
-             CodeGenerator& o)              
+             CodeGenerator& o,
+             std::string prefix="")              
     : _cpp(basename+".cpp")
     , _obj(basename+".o")
     , _gccfd(0) {
     
-    ValueMap empty;
+    ValueMap empty = get_zero_valued_rirnode_count_features(prefix);
     constructor(basename, o, empty);
   }
 
@@ -162,7 +164,7 @@ public:
   }
   
   std::string generateCXXFLAGS(ValueMap& features_for_flags) {
-    HeuristicManager& hm = HeuristicManager::instance();
+    //HeuristicManager& hm = HeuristicManager::instance();
     std::ostringstream all_flags;
     all_flags << CXXFLAGS;
     all_flags << "-O";
@@ -489,7 +491,7 @@ int main( int argc, const char ** argv){
   o.createTunable(true, "system.size.blocksize",  "opencl_blocksize", 16, 0, 25); // 0 means not using local memory
 #endif
   o.cg().endGlobal();
-  ccfiles.push_back(OutputCode(GENMISC, o));
+  ccfiles.push_back(OutputCode(GENMISC, o, "Transform"));
   o.outputTunables(o.os());
   o.comment("A hook called by PetabricksRuntime");
   o.beginFunc("petabricks::PetabricksRuntime::Main*", "petabricksMainTransform");

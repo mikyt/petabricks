@@ -29,9 +29,18 @@
 
 #define countfeature(type) \
   feature[prefix + RIRNode::typeStr((type)) + "_count"] = \
-    bodyir->subnodeCount((type))
+     bodyir ? bodyir->subnodeCount((type)) : 0
   
-  
+void petabricks::ValueMap::print(std::ostream& o) const {
+  o << "ValueMap ";
+  for (ValueMap::const_iterator i=begin(), e=end(); i!=e; ++i) {
+    o << i->first;
+    o << ":";
+    o << jalib::XToString(i->second);
+    o << ";  ";
+  }
+}
+                                                        
 petabricks::ValueMap petabricks::get_rirnode_count_features(
                                                       RIRBlockCopyRef bodyir,
                                                       std::string prefix) {
@@ -56,3 +65,8 @@ petabricks::ValueMap petabricks::get_rirnode_count_features(
   return feature;
 
 }
+
+petabricks::ValueMap petabricks::get_zero_valued_rirnode_count_features(std::string prefix) {
+                              RIRBlockCopyRef empty;
+                              return get_rirnode_count_features(empty, prefix);
+                            }

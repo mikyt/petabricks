@@ -29,10 +29,18 @@
 
 #include "ruleir.h"
 namespace petabricks {
-typedef std::map<std::string, double> ValueMap;
+
+class ValueMap : public jalib::JPrintable, 
+                 public std::map<std::string, double> {
+public:
+  void print(std::ostream& o) const;
+};
+
 
 ValueMap get_rirnode_count_features(RIRBlockCopyRef bodyir,
                                     std::string prefix="");
+
+ValueMap get_zero_valued_rirnode_count_features(std::string prefix="");
 
 }
 

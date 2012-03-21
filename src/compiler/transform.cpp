@@ -32,7 +32,7 @@
 #include "pbc.h"
 #include "scheduler.h"
 #include "syntheticrule.h"
-
+#include "featurecomputer.h"
 #include "common/jconvert.h"
 
 #include <algorithm>
@@ -1166,7 +1166,14 @@ petabricks::ValueMap petabricks::Transform::computeFeatures(std::string prefix) 
   for(RuleList::const_iterator i=_rules.begin(), e=_rules.end(); i!=e; ++i) {
     RulePtr rule = *i;
     ValueMap tmpresult = rule->computeFeatures(prefix);
-    
+    sum_partial_count_valuemap(result, tmpresult);
+  }
+  
+  if(_rules.begin()==_rules.end()) {
+    //No rules in the transform!
+    //We need to build an set of zero-valued features
+    RIRBlockCopyRef emptybody;
+    ValueMap tmpresult = get_rirnode_count_features(emptybody, prefix);
     sum_partial_count_valuemap(result, tmpresult);
   }
   return result;
