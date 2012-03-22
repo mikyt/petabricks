@@ -49,9 +49,9 @@ t_GE = r'>='
 
 # -------------------------- PARSER ----------------------------
 precedence = (
+  ('right', 'IF', 'THEN', 'ELSE'),
   ('left', 'AND', 'OR'),
   ('nonassoc', '=', '#', '<', '>', 'LE', 'GE'),
-  ('right', 'IF', 'THEN', 'ELSE'),
   ('left', '-', '+'),
   ('left', '*', '/'),
   ('left', '^'),
