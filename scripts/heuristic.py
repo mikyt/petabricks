@@ -6,6 +6,7 @@ import random
 import pprint
 import copy
 import xml.dom.minidom
+from formula import resulttype as resulttype_from_str
 
 from xml.sax.saxutils import escape
 
@@ -20,7 +21,8 @@ class Heuristic(object):
                min_val=None, max_val=None):
     self._name = name
     self._formula = formula
-    self.resulttype = resulttype
+    
+    self.resulttype = resulttype_from_str(resulttype)
 
     if (uses is None) or uses=="":
       self._uses=None
@@ -280,7 +282,24 @@ is evolved until it becomes different and unique"""
         self.forceEvolution(all_available_features)
         logger.debug("New (evolved): %s", pp.pformat(self))
 
-
+  
+  def provide_formulas(self, neededHeuristics):
+      """Return an heuristic set made by all the elements of neededHeuristics
+      that could find a corresponding formula in the current heuristic set.
+      The other data of each heuristic (min, max, etc) are taken from 
+      neededHeuristics."""
+      new_hset = HeuristicSet()
+      for neededHeuristic in neededHeuristics:
+          name = neededHeuristic.name
+          try:
+              formula = self[name].formula
+              new_hset[name] = neededHeuristic.derive_heuristic(formula)
+          except KeyError:
+              #No such heuristic in the current hset
+              #Just exclude the heuristic from the new hset
+              pass
+      return new_hset
+              
 
 class HeuristicManager:
   """Manages sets of heuristics stored in a file with the following format:

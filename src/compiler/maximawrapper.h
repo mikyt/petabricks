@@ -67,7 +67,7 @@ public:
   /// Run a command and assert a single output
   FormulaPtr runCommandSingleOutput(const std::string& cmd){
     FormulaListPtr rslt = runCommand(cmd);
-    JASSERT(rslt->size()==1)(rslt->size());
+    JASSERT(rslt->size()==1)(rslt->size())(cmd);
     return rslt->front();
   }
 

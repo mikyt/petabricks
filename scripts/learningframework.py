@@ -241,8 +241,6 @@ The candidates should already be ordered (from the best one to the worst one)"""
 getting the current best heuristics, without modifying them"""
 
     allHSets = []
-    #Get the best N heuristics of each kind
-    #TODO: use information about the best heuristic sets!!!
     heuristicLists = {}
     for heur in neededHeuristics:
         kind = heur.name
@@ -267,8 +265,27 @@ getting the current best heuristics, without modifying them"""
       pass
 
     return allHSets
+ 
+ 
+  def _getBestHeuristicSubsets(self, neededHeuristics, N):
+      """Return the N best sets of heuristics.
+      They could be made by just a subset of the needed heuristics.
+      N is a maximum limit. If not enough sets are available, less than N sets
+      will be returned"""
       
-
+      all_hsets = []
+      scored_IDs = self._db.getNBestHeuristicSubsetID(neededHeuristics, N)
+      
+      for _, ID in scored_IDs:
+          db_hset = self._db.getHeuristicSet(ID) 
+          new_hset = db_hset.provide_formulas(neededHeuristics)
+          all_hsets.append(new_hset)
+          logger.debug("Subset from DB: %s", new_hset)
+          
+      return all_hsets
+      
+      
+  
   def _test_with_mapreduce(self, benchmark, all_hsets, additional_parameters):
       testfn_import_data = get_function_import_data(self._testHSet)
       print testfn_import_data
@@ -315,9 +332,16 @@ result inside the candidates list taken from the additional parameters"""
                                          NUM_ELITE_MOST_FREQUENT, 
                                          self._db.getNMostFrequentHeuristics)
     allHSets.extend(elite)
-    numGenerated = len(allHSets)
+    
 
+    numGenerated = len(allHSets)
+    numNeeded = self._minTrialNumber - numGenerated
+    best_subsets = self._getBestHeuristicSubsets(neededHeuristics, numNeeded)
+    allHSets.extend(best_subsets)
+    logger.debug("Retrieved %d best subsets from DB", len(best_subsets))
+    
     #Generate the ramaining needed (empty) heuristicSets
+    numGenerated = len(allHSets)
     numNeeded = self._minTrialNumber - numGenerated
     for _ in range(numNeeded):
       allHSets.append(HeuristicSet())

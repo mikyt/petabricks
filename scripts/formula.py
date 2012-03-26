@@ -134,11 +134,13 @@ def pythonize_str(formula_str):
         
 
 def resulttype(resulttype_str):
-    if resulttype_str == "int":
+    s = str(resulttype_str)
+    
+    if s == "int":
         return IntegerResult
-    elif resulttype_str == "double":
+    elif s == "double":
         return DoubleResult
-    elif resulttype_str == "bool":
+    elif s == "bool":
         return BooleanResult
     else:
         raise WrongResultTypeError(resulttype_str)    
@@ -682,7 +684,8 @@ class FormulaIf:
       
       self.cond.set_available_features(available_features)
       self.thenClause.set_available_features(available_features)
-      self.elseClause.set_available_features(available_features)
+      if self.elseClause:
+          self.elseClause.set_available_features(available_features)
   
   def get_available_features(self):
       return self._available_features

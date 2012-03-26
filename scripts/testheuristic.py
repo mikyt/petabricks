@@ -96,6 +96,15 @@ class TestHeuristic(unittest.TestCase):
         self.assertEqual(h.formula, "true")
         self.assertEqual(h.resulttype, formula.BooleanResult)
 
+    def test_type_from_text(self):
+        h = Heuristic("Kind", "a+b", "int")
+        self.assertEqual(h.resulttype, formula.IntegerResult)
+        
+        h = Heuristic("Kind", "a+b", "double")
+        self.assertEqual(h.resulttype, formula.DoubleResult)
+        
+        h = Heuristic("Kind", "a+b", "bool")
+        self.assertEqual(h.resulttype, formula.BooleanResult)
         
 class TestHeuristicSet(unittest.TestCase):
     def test_strings(self):
@@ -108,7 +117,7 @@ class TestHeuristicSet(unittest.TestCase):
         hset[h2.name] = h2
         hset[h3.name] = h3
         
-        self.assertEqual(hset.toXmlStrings(), ['<heuristic name="Kind3" formula="true" type="bool" />',
+        self.assertEqual(hset.toXmlStringList(), ['<heuristic name="Kind3" formula="true" type="bool" />',
                                                '<heuristic name="Kind2" formula="b" type="double" />',
                                                '<heuristic name="Kind1" formula="a" type="int" />'])
                                                
