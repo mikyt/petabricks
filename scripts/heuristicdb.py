@@ -187,7 +187,7 @@ class HeuristicDB:
         setID = self._getHeuristicSetID(hSet)
         cur = self._db.cursor()
         query = ("UPDATE HeuristicSet SET useCount=useCount+1 WHERE ID=?")
-        cur.execute(query, setID)
+        cur.execute(query, (setID, ))
         cur.close()
     except HeuristicSetNotFoundError:
         setID = self._storeNewHeuristicSetScore(hSet, score=0, 
@@ -275,7 +275,7 @@ class HeuristicDB:
           
           #Cache in the object
           heuristicSet.ID = result
-          
+          logger.debug("HeuristicSet: ID=%s, type=%s", (result, type(result)))
           return result
       except TypeError:
           raise HeuristicSetNotFoundError

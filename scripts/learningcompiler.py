@@ -442,15 +442,18 @@ class LearningCompiler(learningframework.Learner):
       shutil.rmtree(destObjDir)
     logger.debug("Move objdir")
     shutil.move(bestObjDir, destObjDir)
+    
+    #  .cfg file
+    bestCfg = os.path.join(bestSubDir, basename+".cfg")
+    finalCfg = finalBin + ".cfg"
+    logger.debug("Move final cfg")
+    shutil.move(bestCfg, finalCfg)
+        
+        
     if bestIndex != 0:
         #Deal with the following files only if the executable was compiled 
         #with some heuristics
         
-        #  .cfg file
-        bestCfg = os.path.join(bestSubDir, basename+".cfg")
-        finalCfg = finalBin + ".cfg"
-        logger.debug("Move final cfg")
-        shutil.move(bestCfg, finalCfg)
         #  input heuristic file
         bestHeurFile = os.path.join(bestSubDir, CONF_HEURISTIC_FILE_NAME)
         finalHeurFile = finalBin+".heur"
