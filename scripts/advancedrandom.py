@@ -23,3 +23,14 @@ The higher the weight, the higher the probability of being chosen"""
     num_candidates = len(weighted_candidates)
     last_candidate = weighted_candidates[num_candidates-1] 
     return last_candidate[1]
+    
+    
+def random_multiple_roulette_selection(weighted_candidates, N):
+    """Uses roulette selection to build a list of N elements taken from the 
+    given weighted candidates"""
+    result = []
+    for _ in range(N):
+        result.append(random_roulette_selection(weighted_candidates))
+    
+    return result
+        
