@@ -351,6 +351,8 @@ result inside the candidates list taken from the additional parameters"""
     for hSet in allHSets:
       logger.debug("Completing %s", hSet)
       hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
+      
+      hSet.evolve(self._get_available_features(benchmark))
 
       previousHSets = allHSets[:count]
       hSet.ensureUnique(previousHSets, self._get_available_features(benchmark))

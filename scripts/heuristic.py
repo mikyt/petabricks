@@ -6,7 +6,6 @@ import random
 import pprint
 import copy
 import xml.dom.minidom
-from formula import resulttype as resulttype_from_str
 
 from xml.sax.saxutils import escape
 
@@ -15,6 +14,8 @@ logger = logging.getLogger(__name__)
 #-------------- Config --------------
 CONF_EXPLORATION_PROBABILITY = 0.3
 #------------------------------------
+
+resulttype_from_str = formula.resulttype
 
 class Heuristic(object):
   def __init__(self, name, formula, resulttype, uses=None, tooLow=None, tooHigh=None, 
@@ -136,12 +137,18 @@ class Heuristic(object):
   def max_val(self):
       return self._max
 
+      
   def evolve(self, available_features):
     formulaObj = maximaparser.parse(self._formula)
     formulaObj.set_available_features(available_features)
     formulaObj.evolve(self._min, self._max)
-    self._formula=str(formulaObj)
+    newformula = str(formulaObj)
+    logger.debug("Heuristic %s evolved", self.name)
+    logger.debug("from: %s", self.formula)
+    logger.debug("to:   %s", newformula)
+    self._formula = newformula
 
+    
   def derive_needed_heuristic(self, available_features):
       """Return a NeededHeuristic object corresponding to the current heuristic.
 
@@ -236,10 +243,6 @@ heuristics in the database  """
       logger.debug("Heuristic %s is missing", missing_heur)
       bestN = db.getBestNHeuristics(missing_heur.name, N)
       if len(bestN) == 0:
-          #No such heuristic in the DB. Do not complete the set
-          #This is not a problem. It's probably a new heuristic:
-          #just ignore it and it will fall back on the default implemented
-          #into the compiler
           logger.debug("Not in the DB. Generate random heuristic:")
           heur = Heuristic.generate(missing_heur.name, 
                                     missing_heur.available_features,
@@ -250,18 +253,14 @@ heuristics in the database  """
       else:  
           selected_formula = advancedrandom.random_roulette_selection(bestN)
           heur = missing_heur.derive_heuristic(selected_formula)
-      
-          if random.random() < CONF_EXPLORATION_PROBABILITY:
-              #Generate a new formula by modifying the existing one        
-              heur.evolve(missing_heur.available_features)
-              logger.debug("Evolution\nFrom: %s\nTo: %s", selected_formula, heur.formula)
-          else:
-              logger.debug("No evolution for: %s", selected_formula)
             
-      logger.debug("----------------------")
       self[heur.name] = heur
       
 
+  def evolve(self, all_available_features):
+      if random.random() < CONF_EXPLORATION_PROBABILITY:
+          self.forceEvolution(all_available_features)
+          
   def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
     heuristic.evolve(all_available_features[name])
