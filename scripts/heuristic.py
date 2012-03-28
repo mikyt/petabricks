@@ -12,7 +12,7 @@ from xml.sax.saxutils import escape
 logger = logging.getLogger(__name__)
 
 #-------------- Config --------------
-CONF_EXPLORATION_PROBABILITY = 0.3
+CONF_EXPLORATION_PROBABILITY = 0.1
 #------------------------------------
 
 resulttype_from_str = formula.resulttype
@@ -258,8 +258,9 @@ heuristics in the database  """
       
 
   def evolve(self, all_available_features):
-      if random.random() < CONF_EXPLORATION_PROBABILITY:
-          self.forceEvolution(all_available_features)
+      for name, heuristic in self.iteritems():
+          if random.random() < CONF_EXPLORATION_PROBABILITY:
+              heuristic.evolve(all_available_features[name])
           
   def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
