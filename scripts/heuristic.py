@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 #-------------- Config --------------
 CONF_EXPLORATION_PROBABILITY = 0.1
+CONF_MAX_EVOLUTION_RATE = 0.3
 #------------------------------------
 
 resulttype_from_str = formula.resulttype
@@ -258,9 +259,11 @@ heuristics in the database  """
       
 
   def evolve(self, all_available_features):
-      for name, heuristic in self.iteritems():
-          if random.random() < CONF_EXPLORATION_PROBABILITY:
-              heuristic.evolve(all_available_features[name])
+      if random.random() < CONF_EXPLORATION_PROBABILITY:
+          evolution_rate = random.uniform(0, CONF_MAX_EVOLUTION_RATE)
+          tobechanged = max(1, int(len(self)*evolution_rate)) #At least one!
+          for _ in range(tobechanged):
+              self.forceEvolution(all_available_features)
           
   def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
