@@ -1,0 +1,346 @@
+#!/usr/bin/python
+"""Framework implementing long term learning of heuristics for the PetaBricks
+compiler
+
+Michele Tartara <mikyt@users.sourceforge.net>"""
+
+import learningframework
+import heuristic
+import formula
+import logging
+import mylogger
+import optparse
+import os
+import shutil
+import subprocess
+import sys
+
+#------------------ Config --------------------
+CONF_TIMING_TOOL = os.path.join(sys.path[0],"time.py")
+CONF_TIMING_FILE_NAME = "tmp_time"
+CONF_DELETE_TEMP_DIR = True
+#CONF_TIMEOUT = 60*30
+#CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
+#STATIC_INPUT_PREFIX = "learning_compiler_static"
+#NUM_TIMING_TESTS = 5
+#----------------------------------------------
+
+
+logger = logging.getLogger(__name__)
+
+class Error(Exception):
+    """Base exception class for this module, inherited by all the other 
+    exceptions"""
+    pass
+
+class CompilationError(Error):
+    pass
+
+class TimingRunError(Error):
+    pass
+
+class WrongHeuristicTypeError(Error):
+    pass
+
+def parseCmdline():
+    parser = optparse.OptionParser(
+        usage="usage: learninggcc.py [options] testprogram"
+    )
+#    parser.add_option("--heuristics",
+#                      type="string",
+#                      help="name of the file containing the set of heuristics to use",
+#                      default=None)
+    parser.add_option("--logfile",
+                        type="string",
+                        help="file containing the log of errors",
+                        default="log.dat")
+    parser.add_option("--usemapreduce",
+                        help=("Use the mincemeat.py library to distribute the "
+                            "computation with a mapreduce approach"),
+                        action="store_true", 
+                        dest="usemapreduce", 
+                        default=False)
+    parser.add_option("--mintrialnumber",
+                        type="int",
+                        help=("minimum number of heuristics to generate for the "
+                              "learning process"),
+                        default=8)
+    parser.add_option("--knowledge",
+                      type="string",
+                      help=("file containing the long-term learning knowledge "
+                            "base"),
+                      default=None)
+    parser.add_option("--tmpdir",
+                      type="string",
+                      help=("directory used for the temporary files"),
+                      default="/tmp/")
+                      
+    return parser.parse_args()
+        
+        
+def compute_speedup(candidate, reference):
+    speedup = reference / candidate
+    return speedup
+
+
+def compilebenchmark(programdir, gccflags=None):
+    cmd = [os.path.join(programdir, "__compile"), "gcc"]
+    
+    if gccflags:
+        env = dict(os.environ)
+        env["CCC_OPTS"] = gccflags
+    else:
+        #Use default environment
+        env = None
+    
+    logger.debug("Executing: %s", " ".join(cmd))
+    p = subprocess.Popen(cmd, cwd=programdir, env=env)
+    retcode = p.wait()
+    
+    if retcode != 0:
+        raise CompilationError(retcode)
+        
+def timingrun(programdir):
+    cmd = [os.path.join(programdir, "__run"), "1", "1"]
+    
+    env = dict(os.environ)
+    env["CCC_RE"] = CONF_TIMING_TOOL
+    
+    logger.debug("Executing: %s", " ".join(cmd))
+    p = subprocess.Popen(cmd, cwd=programdir, env=env)
+    retcode = p.wait()
+
+    if retcode != 0:
+        raise TimingRunError(retcode)
+    
+    timingfilename = os.path.join(programdir, CONF_TIMING_FILE_NAME)
+    timingfile = open(timingfilename)
+    time = float(timingfile.readline())
+    timingfile.close()
+    return time
+
+def copybenchmark(benchmark, destdir):
+    srcdir = os.path.join(benchmark, "src")
+    shutil.copytree(srcdir, destdir)
+    
+def hset_to_flag_string(hset, valuemap={}):
+    flags = []
+    for heuristic in hset.itervalues():
+        flags.append(heuristic_to_flagstring(heuristic, valuemap))
+    return " ".join(flags)
+
+def heuristic_to_flagstring(heuristic, valuemap):
+    heuristic.increase_uses()
+    if heuristic.resulttype == formula.BooleanResult:
+        return heuristic_bool_to_flagstring(heuristic, valuemap)
+    elif heuristic.resulttype == formula.IntegerResult:
+        return heuristic_int_to_flagstring(heuristic, valuemap)
+    raise WrongHeuristicTypeError
+        
+
+def heuristic_bool_to_flagstring(heuristic, valuemap):
+    useflag = heuristic.evaluate(valuemap)
+    if useflag:
+        return heuristic.name
+    else:
+        return ""
+    
+def heuristic_int_to_flagstring(heuristic, valuemap):
+    value = heuristic.evaluate(valuemap)
+    
+    if heuristic.min_val and value < heuristic.min_val:
+        value = heuristic.min_val
+        heuristic.increase_tooLow()
+    elif heuristic.max_val and value > heuristic.max_val:
+        value = heuristic.max_val
+        heuristic.increase_tooHigh()
+        
+    return "%s=%d" % (heuristic.name, value)
+    
+    
+def default_hset(needed_heuristics):
+    hset = heuristic.HeuristicSet()
+    for needed in needed_heuristics:
+        if needed.resulttype == formula.BooleanResult:
+            hset[needed.name] = needed.derive_heuristic("false")  
+        elif needed.resulttype == formula.IntegerResult:
+            hset[needed.name] = needed.derive_heuristic(needed.default_value)
+        else:
+            raise WrongHeuristicTypeError
+        
+    return hset
+    
+    
+def test_heuristic_set(benchmark, count, hSet, additionalParameters):
+    """Return the object representing a tested candidate, with (at least) the
+following attributes:
+
+  * failed (bool): has the candidate failed the compilation/testing process?
+  * assignScores (bool): should the score be assigned to the candidate normally
+                         or should we just mark it as used (thus penalizing it)
+  * heuristicSet (HeuristicSet): the set of heuristics that generated the
+                                 program"""
+    candidate = None
+    basesubdir = additionalParameters["basesubdir"]
+    reference = additionalParameters["reference_performance"]
+    dirnumber = count + 1    
+
+    logger.info("Testing candidate %d", dirnumber)
+    
+    #Define more file names
+    programdir = os.path.join(basesubdir, str(dirnumber)+".tmp")
+    if os.path.isdir(programdir):
+        #Create the output directory
+        shutil.rmtree(programdir)
+
+    copybenchmark(benchmark, programdir)
+    
+    try:
+        hSet.prepare_for_usage_statistics()
+        
+        gccflags = hset_to_flag_string(hSet)
+
+        compilebenchmark(programdir, gccflags)
+        
+        execution_time = timingrun(programdir)
+ 
+        candidate = learningframework.SuccessfulCandidate(hSet)
+        candidate.executionTime = execution_time
+        candidate.speedup = compute_speedup(execution_time, reference)
+
+        return candidate
+
+    except TimingRunError:
+        logger.exception("Candidate %d FAILED during testing with static input:", dirnumber)
+        return learningframework.FailedCandidate(hSet, assignScores = True)    
+    
+    
+    
+class LearningGCC(learningframework.Learner):
+  _testHSet = staticmethod(test_heuristic_set)
+  
+  def __init__(self, heuristicSetFileName=None, use_mapreduce=False, 
+               min_trial_number=None, knowledge=None, tmpdir=None):
+    super(LearningGCC, self).__init__(heuristicSetFileName, 
+                                      use_mapreduce=use_mapreduce,
+                                      min_trial_number=min_trial_number,
+                                      knowledge=knowledge)
+    self.min_trial_number = min_trial_number
+    self.tmpdir = tmpdir
+
+  def close(self):
+       super(LearningGCC, self).close()
+       
+  @staticmethod
+  def _candidateSortingKey(candidate):
+      """Generates a comparison key for a candidate.
+    Candidates are sorted by speedup wrt the reference candidate (compiled
+    with default heuristics).
+    The first candidate is the one with the bigger speedup"""
+      if candidate.failed:
+        return float('inf')
+      return (1.0 / candidate.speedup)
+  
+  def compileProgram(self, benchmark, finalBinary = None, learn=True):
+    self._finalBinary = finalBinary
+    self._neededHeuristics=[]
+    self._availablefeatures = None
+
+    return self.use_learning(benchmark, learn)
+    
+
+  def _setup(self, benchmark, additionalParameters):
+    #Define file names
+    path, basename = os.path.split(benchmark)
+    if path == "":
+      path="./"
+    basesubdir = benchmark
+    
+    additionalParameters["basesubdir"] = basesubdir
+    additionalParameters["basename"] = basename
+    additionalParameters["path"] = path
+    candidates = additionalParameters["candidates"]
+    
+    #Compile with default heuristics
+    programdir= os.path.join(basesubdir, "0.tmp")
+    if os.path.isdir(programdir):
+      #Create the output directory
+      shutil.rmtree(programdir)
+    
+    copybenchmark(benchmark, programdir)
+    
+    try: 
+        hSet = default_hset(self._getNeededHeuristics(benchmark))
+        
+        hSet.prepare_for_usage_statistics()
+        
+        gccflags = hset_to_flag_string(hSet)
+
+        compilebenchmark(programdir, gccflags)
+        
+        execution_time = timingrun(programdir)
+        
+        default_candidate = learningframework.SuccessfulCandidate(hSet)
+        default_candidate.speedup = 1 #This is the reference for the speedup
+        default_candidate.originalIndex = -1
+        default_candidate.executionTime = execution_time
+        
+        candidates.append(default_candidate)
+                
+        #Store for later use by the candidates        
+        additionalParameters["reference_performance"] = execution_time
+            
+        self._availablefeatures = heuristic.AvailableFeatures()
+        for needed in self._getNeededHeuristics(benchmark):
+            self._availablefeatures[needed.name] = []
+            
+        return 0        
+    except CompilationError:
+        logger.exception("Default candidate failed during testing with static "
+                       "input")
+        return -1
+
+  def _getNeededHeuristics(self, unused_benchmark):
+    heurlist = []
+    
+    heurlist.append(heuristic.NeededHeuristic("-funroll-loops", [], formula.BooleanResult))
+    heurlist.append(heuristic.NeededHeuristic("-fweb", [], formula.BooleanResult))
+    
+    return heurlist
+
+
+  def _get_available_features(self, unused_benchmark, heuristic_name=None):
+      if heuristic_name is not None:
+          return self._availablefeatures[heuristic_name]
+         
+      return self._availablefeatures
+      
+
+  def _tearDown(self, _, additionalParameters):
+    basesubdir = additionalParameters["basesubdir"]
+  
+    #Delete all the rest
+    if CONF_DELETE_TEMP_DIR:
+      for i in range(self.min_trial_number+1):
+          dirname = os.path.join(basesubdir, str(i)+".tmp")
+          shutil.rmtree(dirname, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    
+    (options, args) = parseCmdline()
+    
+    mylogger.configureLogging(options.logfile)
+    
+    if len(args)==0:
+        print "Usage: learninggcc.py [options] benchmark"
+        sys.exit(1)
+                
+    l = LearningGCC(use_mapreduce=options.usemapreduce,
+                    knowledge=options.knowledge,
+                    tmpdir=options.tmpdir,
+                    min_trial_number=options.mintrialnumber)
+
+    program = os.path.abspath(args[0])
+    l.compileProgram(program)
+    l.close()

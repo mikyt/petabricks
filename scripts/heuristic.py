@@ -121,14 +121,23 @@ class Heuristic(object):
   def uses(self):
     return self._uses
 
+  def increase_uses(self, uses=1):
+      self._uses = self._uses + uses
+      
   @property
   def tooLow(self):
     return self._tooLow
 
+  def increase_tooLow(self, count=1):
+      self._tooLow = self._tooLow + count
+  
   @property
   def tooHigh(self):
     return self._tooHigh
-    
+  
+  def increase_tooHigh(self, count=1):
+      self._tooHigh = self._tooHigh + count
+  
   @property
   def min_val(self):
       return self._min
@@ -159,8 +168,22 @@ Everything else will be None"""
       return NeededHeuristic(self._name, available_features, self.resulttype, 
                              min_val=self._min, max_val=self._max)
       
-  
-
+  def evaluate(self, valuemap):
+      """Evaluate the current heuristic with the values contained in the map
+      (name : value)"""
+      formulaObj = maximaparser.parse(self._formula)
+      pstring = formulaObj.to_python_string()
+      logger.debug("Evaluating: %s", pstring)
+      res = eval(pstring, valuemap)
+      
+      return res
+      
+  def prepare_for_usage_statistics(self):
+      self._uses = 0
+      self._tooLow = 0
+      self._tooHigh = 0
+      
+      
 class AvailableFeatures(dict):
     def importFromXmlDOM(self, xmlDOM):
         for heuristic_dom in xmlDOM.getElementsByTagName("availablefeatures"):
@@ -302,8 +325,13 @@ is evolved until it becomes different and unique"""
               #Just exclude the heuristic from the new hset
               pass
       return new_hset
-              
-
+          
+          
+  def prepare_for_usage_statistics(self):
+      for heuristic in self.itervalues():
+          heuristic.prepare_for_usage_statistics()
+          
+          
 class HeuristicManager:
   """Manages sets of heuristics stored in a file with the following format:
 <heuristics>

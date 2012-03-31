@@ -275,7 +275,7 @@ class HeuristicDB:
           
           #Cache in the object
           heuristicSet.ID = result
-          logger.debug("HeuristicSet: ID=%s, type=%s", (result, type(result)))
+          logger.debug("HeuristicSet: ID=%s, type=%s", result, type(result))
           return result
       except TypeError:
           raise HeuristicSetNotFoundError
