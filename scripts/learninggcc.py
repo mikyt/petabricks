@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 #------------------ Config --------------------
-CONF_TIMING_TOOL = os.path.join(sys.path[0],"time.py")
+CONF_TIMING_TOOL = os.path.join(sys.path[0],"timer.py")
 CONF_TIMING_FILE_NAME = "tmp_time"
 CONF_DELETE_TEMP_DIR = True
 #CONF_TIMEOUT = 60*30
