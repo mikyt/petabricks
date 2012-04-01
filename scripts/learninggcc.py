@@ -42,6 +42,9 @@ class TimingRunError(Error):
 class WrongHeuristicTypeError(Error):
     pass
 
+class HeuristicEvaluationFailedError(Error):
+    pass
+
 def parseCmdline():
     parser = optparse.OptionParser(
         usage="usage: learninggcc.py [options] testprogram"
@@ -101,7 +104,7 @@ def compilebenchmark(programdir, gccflags=None):
         raise CompilationError(retcode)
         
 def timingrun(programdir):
-    cmd = [os.path.join(programdir, "__run"), "1", "1"]
+    cmd = [os.path.join(programdir, "__run"), "1"]
     
     env = dict(os.environ)
     env["CCC_RE"] = CONF_TIMING_TOOL
@@ -131,11 +134,14 @@ def hset_to_flag_string(hset, valuemap={}):
 
 def heuristic_to_flagstring(heuristic, valuemap):
     heuristic.increase_uses()
-    if heuristic.resulttype == formula.BooleanResult:
-        return heuristic_bool_to_flagstring(heuristic, valuemap)
-    elif heuristic.resulttype == formula.IntegerResult:
-        return heuristic_int_to_flagstring(heuristic, valuemap)
-    raise WrongHeuristicTypeError
+    try:
+        if heuristic.resulttype == formula.BooleanResult:
+            return heuristic_bool_to_flagstring(heuristic, valuemap)
+        elif heuristic.resulttype == formula.IntegerResult:
+            return heuristic_int_to_flagstring(heuristic, valuemap)
+        raise WrongHeuristicTypeError
+    except ZeroDivisionError:
+        raise HeuristicEvaluationFailedError(heuristic, valuemap)
         
 
 def heuristic_bool_to_flagstring(heuristic, valuemap):
@@ -195,25 +201,24 @@ following attributes:
 
     copybenchmark(benchmark, programdir)
     
+    hSet.prepare_for_usage_statistics()
+    
     try:
-        hSet.prepare_for_usage_statistics()
-        
         gccflags = hset_to_flag_string(hSet)
 
         compilebenchmark(programdir, gccflags)
         
         execution_time = timingrun(programdir)
- 
+
         candidate = learningframework.SuccessfulCandidate(hSet)
         candidate.executionTime = execution_time
         candidate.speedup = compute_speedup(execution_time, reference)
 
         return candidate
+    except HeuristicEvaluationFailedError:
+        candidate = learningframework.FailedCandidate(hSet, assignScores=True)
+        return candidate
 
-    except TimingRunError:
-        logger.exception("Candidate %d FAILED during testing with static input:", dirnumber)
-        return learningframework.FailedCandidate(hSet, assignScores = True)    
-    
     
     
 class LearningGCC(learningframework.Learner):
@@ -241,8 +246,7 @@ class LearningGCC(learningframework.Learner):
         return float('inf')
       return (1.0 / candidate.speedup)
   
-  def compileProgram(self, benchmark, finalBinary = None, learn=True):
-    self._finalBinary = finalBinary
+  def compileProgram(self, benchmark, learn=True):
     self._neededHeuristics=[]
     self._availablefeatures = None
 
@@ -254,7 +258,7 @@ class LearningGCC(learningframework.Learner):
     path, basename = os.path.split(benchmark)
     if path == "":
       path="./"
-    basesubdir = benchmark
+    basesubdir = os.path.abspath(benchmark)
     
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
@@ -296,16 +300,15 @@ class LearningGCC(learningframework.Learner):
             
         return 0        
     except CompilationError:
-        logger.exception("Default candidate failed during testing with static "
-                       "input")
+        logger.exception("Default candidate compilation failed")
         return -1
 
   def _getNeededHeuristics(self, unused_benchmark):
     heurlist = []
     
-    heurlist.append(heuristic.NeededHeuristic("-funroll-loops", [], formula.BooleanResult))
-    heurlist.append(heuristic.NeededHeuristic("-fweb", [], formula.BooleanResult))
-    
+    script_path = sys.path[0]
+    heuristicfile = os.path.join(script_path, "gccneededheuristics.inc")
+    execfile(heuristicfile)
     return heurlist
 
 
@@ -318,8 +321,16 @@ class LearningGCC(learningframework.Learner):
 
   def _tearDown(self, _, additionalParameters):
     basesubdir = additionalParameters["basesubdir"]
-  
-    #Delete all the rest
+    candidates = additionalParameters["candidates"]
+    
+    
+    #Write best result on the disk
+    best = candidates[0]
+    timingfile = open(CONF_TIMING_FILE_NAME, "w")
+    timingfile.write(str(best.executionTime))
+    timingfile.close()
+
+    #Delete all the temporary files
     if CONF_DELETE_TEMP_DIR:
       for i in range(self.min_trial_number+1):
           dirname = os.path.join(basesubdir, str(i)+".tmp")
@@ -342,5 +353,6 @@ if __name__ == "__main__":
                     min_trial_number=options.mintrialnumber)
 
     program = os.path.abspath(args[0])
-    l.compileProgram(program)
+    res = l.compileProgram(program)
     l.close()
+    exit(res)
