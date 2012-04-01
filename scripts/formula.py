@@ -582,9 +582,14 @@ operator"""
       return (op, left, right)
       
   def to_python_string(self):
-      return "(%s %s %s)" % (self.left.to_python_string(),
-                             self._pythonOperator(),
-                             self.right.to_python_string())
+      s = "(%s %s %s)" % (self.left.to_python_string(),
+                          self._pythonOperator(),
+                          self.right.to_python_string())
+      
+      if isImmediate(self.left) and isImmediate(self.right):
+          return str(eval(s, {}, {}))
+      
+      return s
       
   
   
@@ -690,7 +695,13 @@ class FormulaIf(Formula):
       
   def to_python_string(self):
       assert(self.elseClause is not None)
-      return "(%s if (%s) else (%s))" % (self.thenClause.to_python_string(),
-                                        self.cond.to_python_string(),
-                                        self.elseClause.to_python_string())
+      s = "(%s if (%s) else (%s))" % (self.thenClause.to_python_string(),
+                                      self.cond.to_python_string(),
+                                      self.elseClause.to_python_string())
+      
+      try:
+          return str(eval(s, {}, {}))
+      except NameError:
+          return s
+      
   
