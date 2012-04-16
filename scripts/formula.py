@@ -132,7 +132,7 @@ def generate(available_features, resulttype, min_val=float("-inf"), max_val=floa
     """Generates a completely random formula, acknowledging the limits,
 if given"""
 
-    formula_types = [(4, _specifictype(resulttype)),
+    formula_types = [(5, _specifictype(resulttype)),
                      (2, FormulaBinop),
                      (1, FormulaIf)]
 

@@ -149,7 +149,7 @@ def heuristic_bool_to_flagstring(heuristic, valuemap):
     if useflag:
         return heuristic.name
     else:
-        return ""
+        return "-fno-"+heuristic.name[2:]
     
 def heuristic_int_to_flagstring(heuristic, valuemap):
     value = heuristic.evaluate(valuemap)
@@ -161,6 +161,10 @@ def heuristic_int_to_flagstring(heuristic, valuemap):
         value = heuristic.max_val
         heuristic.increase_tooHigh()
         
+
+    if heuristic.name=="-O":
+        return "-O"+str(value)
+
     return "%s=%d" % (heuristic.name, value)
     
     
@@ -218,7 +222,10 @@ following attributes:
     except HeuristicEvaluationFailedError:
         candidate = learningframework.FailedCandidate(hSet, assignScores=True)
         return candidate
-
+    except CompilationError:
+        candidate = learningframework.FailedCandidate(hSet, assignScores=True)
+        return candidate
+ 
     
     
 class LearningGCC(learningframework.Learner):
@@ -306,6 +313,10 @@ class LearningGCC(learningframework.Learner):
   def _getNeededHeuristics(self, unused_benchmark):
     heurlist = []
     
+    h = heuristic.NeededHeuristic("-O", [], formula.IntegerResult, min_val=0, max_val=3)
+    h.default_value = 0
+    heurlist.append(h)
+
     script_path = sys.path[0]
     heuristicfile = os.path.join(script_path, "gccneededheuristics.inc")
     execfile(heuristicfile)

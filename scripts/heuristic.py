@@ -12,7 +12,7 @@ from xml.sax.saxutils import escape
 logger = logging.getLogger(__name__)
 
 #-------------- Config --------------
-CONF_EXPLORATION_PROBABILITY = 0.1
+CONF_EXPLORATION_PROBABILITY = 0.2
 CONF_MAX_EVOLUTION_RATE = 0.3
 #------------------------------------
 
@@ -171,7 +171,7 @@ Everything else will be None"""
   def evaluate(self, valuemap):
       """Evaluate the current heuristic with the values contained in the map
       (name : value)"""
-      formulaObj = maximaparser.parse(self._formula)
+      formulaObj = maximaparser.parse(str(self._formula))
       pstring = formulaObj.to_python_string()
       logger.debug("Evaluating: %s", pstring)
       res = eval(pstring, valuemap)
