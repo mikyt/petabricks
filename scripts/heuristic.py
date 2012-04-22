@@ -183,7 +183,19 @@ Everything else will be None"""
       self._tooLow = 0
       self._tooHigh = 0
       
-      
+class FeatureValueMap(dict):
+    def importFromXmlDOM(self, xmlDOM):
+        for feature_dom in xmlDOM.getElementsByTagName("feature"):
+            feature_name = feature_dom.getAttribute("name")
+            feature_value = float(feature_dom.getAttribute("value"))
+            
+            self[feature_name] = feature_value
+           
+           
+    def importFromXml(self, xmlFileName):
+        self.importFromXmlDOM(xml.dom.minidom.parse(xmlFileName))
+
+        
 class AvailableFeatures(dict):
     def importFromXmlDOM(self, xmlDOM):
         for heuristic_dom in xmlDOM.getElementsByTagName("availablefeatures"):

@@ -1,9 +1,33 @@
 #!/usr/bin/python
 
 import unittest
-from heuristic import Heuristic, HeuristicSet, NeededHeuristic
+from heuristic import Heuristic, HeuristicSet, NeededHeuristic, FeatureValueMap
 import formula
+import xml.dom.minidom
 
+class TestFeatureValueMap(unittest.TestCase):
+    def test_importFromXmlDOM(self):
+        xmlfeatures = """<features>
+  <feature name="avg_basic_block_number" value="4.5" count="2" />
+  <feature name="avg_basic_block_single_successor" value="2" count="2" />
+  <feature name="avg_basic_block_two_successors" value="0.5" count="2" />
+  <feature name="avg_basic_block_more_two_successors" value="0" count="2" />
+  <feature name="avg_basic_block_single_predecessor" value="2" count="2" />
+  <feature name="avg_basic_block_two_predecessor" value="0.5" count="2" />
+</features>"""
+        dom = xml.dom.minidom.parseString(xmlfeatures)
+        
+        valuemap = FeatureValueMap()
+        valuemap.importFromXmlDOM(dom)
+        
+        self.assertEqual(valuemap["avg_basic_block_number"], 4.5)
+        self.assertEqual(valuemap["avg_basic_block_single_successor"], 2)
+        self.assertEqual(valuemap["avg_basic_block_two_successors"], 0.5)
+        self.assertEqual(valuemap["avg_basic_block_more_two_successors"], 0)
+        self.assertEqual(valuemap["avg_basic_block_single_predecessor"], 2)
+        self.assertEqual(valuemap["avg_basic_block_two_predecessor"], 0.5)
+        
+        
 class TestNeededHeuristic(unittest.TestCase):
     def test_derive_heuristic(self):
         kind = "NeededHeur"
@@ -120,6 +144,6 @@ class TestHeuristicSet(unittest.TestCase):
         self.assertEqual(hset.toXmlStringList(), ['<heuristic name="Kind3" formula="true" type="bool" />',
                                                '<heuristic name="Kind2" formula="b" type="double" />',
                                                '<heuristic name="Kind1" formula="a" type="int" />'])
-                                               
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

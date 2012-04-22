@@ -19,6 +19,7 @@ import sys
 CONF_TIMING_TOOL = os.path.join(sys.path[0],"timer.py")
 CONF_TIMING_FILE_NAME = "tmp_time"
 CONF_DELETE_TEMP_DIR = True
+CONF_GCC_PLUGIN = "/home/mikyt/programmi/staticcounter/staticcounter.so"
 #CONF_TIMEOUT = 60*30
 #CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #STATIC_INPUT_PREFIX = "learning_compiler_static"
@@ -89,13 +90,16 @@ def compute_speedup(candidate, reference):
 def compilebenchmark(programdir, gccflags=None):
     cmd = [os.path.join(programdir, "__compile"), "gcc"]
     
-    if gccflags:
-        env = dict(os.environ)
-        env["CCC_OPTS"] = gccflags
-    else:
-        #Use default environment
-        env = None
+    gccpluginflag = "-fplugin="+CONF_GCC_PLUGIN
     
+    if not gccflags:
+        gccflags = ""
+    
+    all_gccflags = gccpluginflag + " " + gccflags
+
+    env = dict(os.environ)
+    env["CCC_OPTS"] = all_gccflags
+        
     logger.debug("Executing: %s", " ".join(cmd))
     p = subprocess.Popen(cmd, cwd=programdir, env=env)
     retcode = p.wait()
@@ -165,21 +169,7 @@ def heuristic_int_to_flagstring(heuristic, valuemap):
     if heuristic.name=="-O":
         return "-O"+str(value)
 
-    return "%s=%d" % (heuristic.name, value)
-    
-    
-def default_hset(needed_heuristics):
-    hset = heuristic.HeuristicSet()
-    for needed in needed_heuristics:
-        if needed.resulttype == formula.BooleanResult:
-            hset[needed.name] = needed.derive_heuristic("false")  
-        elif needed.resulttype == formula.IntegerResult:
-            hset[needed.name] = needed.derive_heuristic(needed.default_value)
-        else:
-            raise WrongHeuristicTypeError
-        
-    return hset
-    
+    return "%s=%d" % (heuristic.name, value)    
     
 def test_heuristic_set(benchmark, count, hSet, additionalParameters):
     """Return the object representing a tested candidate, with (at least) the
@@ -193,6 +183,7 @@ following attributes:
     candidate = None
     basesubdir = additionalParameters["basesubdir"]
     reference = additionalParameters["reference_performance"]
+    valuemap = additionalParameters["valuemap"]
     dirnumber = count + 1    
 
     logger.info("Testing candidate %d", dirnumber)
@@ -208,7 +199,7 @@ following attributes:
     hSet.prepare_for_usage_statistics()
     
     try:
-        gccflags = hset_to_flag_string(hSet)
+        gccflags = hset_to_flag_string(hSet, valuemap)
 
         compilebenchmark(programdir, gccflags)
         
@@ -223,6 +214,9 @@ following attributes:
         candidate = learningframework.FailedCandidate(hSet, assignScores=True)
         return candidate
     except CompilationError:
+        candidate = learningframework.FailedCandidate(hSet, assignScores=True)
+        return candidate
+    except TimingRunError:
         candidate = learningframework.FailedCandidate(hSet, assignScores=True)
         return candidate
  
@@ -254,7 +248,7 @@ class LearningGCC(learningframework.Learner):
       return (1.0 / candidate.speedup)
   
   def compileProgram(self, benchmark, learn=True):
-    self._neededHeuristics=[]
+    self._neededHeuristics = None
     self._availablefeatures = None
 
     return self.use_learning(benchmark, learn)
@@ -281,7 +275,8 @@ class LearningGCC(learningframework.Learner):
     copybenchmark(benchmark, programdir)
     
     try: 
-        hSet = default_hset(self._getNeededHeuristics(benchmark))
+        hSet = heuristic.HeuristicSet()
+        hSet["-O"] = (heuristic.Heuristic("-O", "0", formula.IntegerResult))
         
         hSet.prepare_for_usage_statistics()
         
@@ -301,26 +296,42 @@ class LearningGCC(learningframework.Learner):
         #Store for later use by the candidates        
         additionalParameters["reference_performance"] = execution_time
             
+        #Load features value map from file
+        valuemap = heuristic.FeatureValueMap()
+        xmlfilename = os.path.join(programdir, "features.xml")
+        valuemap.importFromXml(xmlfilename)
+        additionalParameters["valuemap"] = valuemap
+        
+        availablefeaturesnames = valuemap.keys()
+
         self._availablefeatures = heuristic.AvailableFeatures()
+
         for needed in self._getNeededHeuristics(benchmark):
-            self._availablefeatures[needed.name] = []
+            self._availablefeatures[needed.name].extend(availablefeaturesnames)
             
+        
         return 0        
     except CompilationError:
         logger.exception("Default candidate compilation failed")
         return -1
 
-  def _getNeededHeuristics(self, unused_benchmark):
-    heurlist = []
+  def _getNeededHeuristics(self, benchmark):
+      if self._neededHeuristics:
+          return self._neededHeuristics
+          
+      heurlist = []
     
-    h = heuristic.NeededHeuristic("-O", [], formula.IntegerResult, min_val=0, max_val=3)
-    h.default_value = 0
-    heurlist.append(h)
+      self._availablefeatures["-O"] = []
+      h = heuristic.NeededHeuristic("-O", self._get_available_features(benchmark, "-O"), formula.IntegerResult, min_val=0, max_val=3)
+      h.default_value = 0
+      heurlist.append(h)
 
-    script_path = sys.path[0]
-    heuristicfile = os.path.join(script_path, "gccneededheuristics.inc")
-    execfile(heuristicfile)
-    return heurlist
+      script_path = sys.path[0]
+      heuristicfile = os.path.join(script_path, "gccneededheuristics.inc")
+      execfile(heuristicfile)
+      
+      self._neededHeuristics = heurlist
+      return self._neededHeuristics
 
 
   def _get_available_features(self, unused_benchmark, heuristic_name=None):
