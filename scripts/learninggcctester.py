@@ -81,8 +81,8 @@ True, than it is also generated"""
 
 
 class HeuristicsGraphDataGenerator(object):
-  def __init__(self, heuristicKinds):
-    self._db = heuristicdb.HeuristicDB()
+  def __init__(self, heuristicKinds, knowledge=None):
+    self._db = heuristicdb.HeuristicDB(knowledge)
     self._heuristicKinds = heuristicKinds
 
     #Output files (one for each heuristic kind)
@@ -232,7 +232,7 @@ def main():
                                         min_trial_number=options.mintrialnumber,
                                         knowledge=options.knowledge)
   tester = TestRunner(compiler)  
-  hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
+  hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS, options.knowledge)
 
   #Open files
   trainingset = open(options.trainingset, "r")

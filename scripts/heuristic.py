@@ -174,9 +174,9 @@ Everything else will be None"""
       formulaObj = maximaparser.parse(str(self._formula))
       pstring = formulaObj.to_python_string()
       logger.debug("Evaluating: %s on %s", pstring, valuemap)
-      res = eval
+      res = eval(pstring, valuemap)
       del valuemap['__builtins__'] #Added by eval
-      
+     
       return res
       
   def prepare_for_usage_statistics(self):
