@@ -1,0 +1,2 @@
+#!/bin/bash
+gcc -O3 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/self._availablefeatures[\"\1\"]=[]\nheurlist.append(heuristic.NeededHeuristic(\"\1\", self._get_available_features(benchmark, \"\1\"), formula.BooleanResult))/" > gccneededheuristics.inc
