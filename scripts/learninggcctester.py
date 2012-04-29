@@ -5,10 +5,8 @@ program.
 The run of the test program is timed and a plot of the times is generated"""
 
 import learninggcc
-import learningframework
 import os
 import sys
-import pbutil
 import heuristicdb
 import logging
 import mylogger
@@ -19,6 +17,7 @@ CONF_TIMEOUT = 5 * 60
 STATIC_INPUT_PREFIX = "test"
 HEURISTIC_KINDS = ["-funroll-loops", "-fweb", "-O", "UseOFlag"]
 MAX_PRINTED_HEURISTICS = 10
+NUM_GENERATIONS = 3
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,11 @@ def parseCmdline():
                       help=("file containing the long-term learning knowledge "
                             "base"),
                       default=None)
-                              
+    parser.add_option("--generations",
+                      type="int",
+                      help=("number of generations to be used for the learning "
+                            "process (default %d)") % NUM_GENERATIONS,
+                      default=NUM_GENERATIONS)
     return parser.parse_args()
 
 
@@ -227,10 +230,10 @@ def main():
   testProgram = os.path.abspath(args[0])
   
   #Create objects
-  compiler = learninggcc.LearningGCC(
-                                        use_mapreduce=options.usemapreduce,
-                                        min_trial_number=options.mintrialnumber,
-                                        knowledge=options.knowledge)
+  compiler = learninggcc.LearningGCC(use_mapreduce=options.usemapreduce,
+                                     min_trial_number=options.mintrialnumber,
+                                     knowledge=options.knowledge,
+                                     generations=options.generations)
   tester = TestRunner(compiler)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS, options.knowledge)
 

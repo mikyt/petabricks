@@ -20,6 +20,7 @@ CONF_TIMING_TOOL = os.path.join(sys.path[0],"timer.py")
 CONF_TIMING_FILE_NAME = "tmp_time"
 CONF_DELETE_TEMP_DIR = True
 CONF_GCC_PLUGIN = "/home/mikyt/programmi/staticcounter/staticcounter.so"
+NUM_GENERATIONS=3
 #CONF_TIMEOUT = 60*30
 #CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #STATIC_INPUT_PREFIX = "learning_compiler_static"
@@ -78,7 +79,11 @@ def parseCmdline():
                       type="string",
                       help=("directory used for the temporary files"),
                       default="/tmp/")
-                      
+    parser.add_option("--generations",
+                      type="int",
+                      help=("number of generations to be used for the learning "
+                            "process (default %d)") % NUM_GENERATIONS,
+                      default=NUM_GENERATIONS)
     return parser.parse_args()
         
         
@@ -226,11 +231,13 @@ class LearningGCC(learningframework.Learner):
   _testHSet = staticmethod(test_heuristic_set)
   
   def __init__(self, heuristicSetFileName=None, use_mapreduce=False, 
-               min_trial_number=None, knowledge=None, tmpdir=None):
+               min_trial_number=None, knowledge=None, tmpdir=None, 
+               generations=NUM_GENERATIONS):
     super(LearningGCC, self).__init__(heuristicSetFileName, 
                                       use_mapreduce=use_mapreduce,
                                       min_trial_number=min_trial_number,
-                                      knowledge=knowledge)
+                                      knowledge=knowledge,
+                                      generations=generations)
     self.min_trial_number = min_trial_number
     self.tmpdir = tmpdir
 
@@ -248,13 +255,13 @@ class LearningGCC(learningframework.Learner):
       return (1.0 / candidate.speedup)
   
   def compileProgram(self, benchmark, learn=True):
-    self._neededHeuristics = None
-    self._availablefeatures = None
-
     return self.use_learning(benchmark, learn)
     
 
   def _setup(self, benchmark, additionalParameters):
+    self._neededHeuristics = None
+    self._availablefeatures = None
+    
     #Define file names
     path, basename = os.path.split(benchmark)
     if path == "":
@@ -372,7 +379,8 @@ if __name__ == "__main__":
     l = LearningGCC(use_mapreduce=options.usemapreduce,
                     knowledge=options.knowledge,
                     tmpdir=options.tmpdir,
-                    min_trial_number=options.mintrialnumber)
+                    min_trial_number=options.mintrialnumber,
+                    generations=options.generations)
 
     program = os.path.abspath(args[0])
     res = l.compileProgram(program)
