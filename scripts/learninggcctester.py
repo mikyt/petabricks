@@ -10,6 +10,7 @@ import sys
 import heuristicdb
 import logging
 import mylogger
+import shutil
 
 from optparse import OptionParser
 
@@ -68,9 +69,7 @@ the average timing result."""
         self._compiler = learningcompiler
         
     def test(self, benchmark):
-        """Perform the test on the src program, generating the outputbinary.
-If staticInputName is specified, such input is used. If generateStaticInput is 
-True, than it is also generated"""        
+        """Perform the test on the benchmark program"""        
         res = self._compiler.compileProgram(benchmark, learn = False)
         if res != 0:
             logger.error("Error compiling the program: %s", benchmark)
@@ -82,7 +81,20 @@ True, than it is also generated"""
         
         return res
 
-
+    def test_initial(self, benchmark):
+        workdir = os.path.join(benchmark, "initial")
+        shutil.rmtree(workdir, ignore_errors=True)
+        learninggcc.copybenchmark(benchmark, workdir)
+        try: 
+            learninggcc.compilebenchmark(workdir, "-O0")
+        except learninggcc.CompilationError:
+            logger.error("Error compiling the initial version of the test program")
+            sys.exit(-1)    
+        res = learninggcc.timingrun(workdir)
+        shutil.rmtree(workdir)
+        return res
+        
+        
 class HeuristicsGraphDataGenerator(object):
   def __init__(self, heuristicKinds, knowledge=None):
     self._db = heuristicdb.HeuristicDB(knowledge)
@@ -242,9 +254,9 @@ def main():
   resultfile = open(options.resultfile, "w")
 
 
-  print "Compiling and testing the initial version of the test program"
+  print "Compiling and testing the initial version of the test program: %s" % testProgram
   
-  res = tester.test(testProgram)
+  res = tester.test_initial(testProgram)
   
   resultfile.write(""""INITIAL" %s\n""" % res)
 
