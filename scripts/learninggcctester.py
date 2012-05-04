@@ -58,6 +58,10 @@ def parseCmdline():
                       help=("number of generations to be used for the learning "
                             "process (default %d)") % NUM_GENERATIONS,
                       default=NUM_GENERATIONS)
+    parser.add_option("--dataset",
+                      type="string",
+                      help="the dataset to be used for evaluating the compiled programs",
+                      default=None)
     return parser.parse_args()
 
 
@@ -65,12 +69,14 @@ class TestRunner(object):
     """Tests the effects of learning, by compiling benchmarks using the given
 learningcompiler with learning disabled, then executing them and fetching 
 the average timing result."""
-    def __init__(self, learningcompiler):
+    def __init__(self, learningcompiler, dataset):
         self._compiler = learningcompiler
+        self.dataset = dataset
         
     def test(self, benchmark):
         """Perform the test on the benchmark program"""        
-        res = self._compiler.compileProgram(benchmark, learn = False)
+        res = self._compiler.compileProgram(benchmark, learn = False, 
+                                            dataset = self.dataset)
         if res != 0:
             logger.error("Error compiling the program: %s", benchmark)
             sys.exit(res)
@@ -90,7 +96,7 @@ the average timing result."""
         except learninggcc.CompilationError:
             logger.error("Error compiling the initial version of the test program")
             sys.exit(-1)    
-        res = learninggcc.timingrun(workdir)
+        res = learninggcc.timingrun(workdir, self.dataset)
         shutil.rmtree(workdir)
         return res
         
@@ -246,7 +252,7 @@ def main():
                                      min_trial_number=options.mintrialnumber,
                                      knowledge=options.knowledge,
                                      generations=options.generations)
-  tester = TestRunner(compiler)  
+  tester = TestRunner(compiler, options.dataset)  
   hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS, options.knowledge)
 
   #Open files
@@ -270,8 +276,7 @@ def main():
 
     print "Learning from "+trainingprogram
 
-
-    res = compiler.compileProgram(trainingprogram)
+    res = compiler.compileProgram(trainingprogram, dataset=options.dataset)
     if res != 0:
         logger.error("Error compiling the program: %s", trainingprogram)
         sys.exit(-1)

@@ -21,6 +21,7 @@ CONF_TIMING_FILE_NAME = "tmp_time"
 CONF_DELETE_TEMP_DIR = True
 CONF_GCC_PLUGIN = "/home/mikyt/programmi/staticcounter/staticcounter.so"
 NUM_GENERATIONS=3
+DEFAULT_DATASET = "1"
 #CONF_TIMEOUT = 60*30
 #CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 #STATIC_INPUT_PREFIX = "learning_compiler_static"
@@ -84,6 +85,10 @@ def parseCmdline():
                       help=("number of generations to be used for the learning "
                             "process (default %d)") % NUM_GENERATIONS,
                       default=NUM_GENERATIONS)
+    parser.add_option("--dataset",
+                      type="string",
+                      help="the dataset to be used for evaluating the compiled programs",
+                      default=None)
     return parser.parse_args()
         
         
@@ -112,8 +117,12 @@ def compilebenchmark(programdir, gccflags=None):
     if retcode != 0:
         raise CompilationError(retcode)
         
-def timingrun(programdir):
-    cmd = [os.path.join(programdir, "__run"), "1"]
+def timingrun(programdir, dataset=None):
+    if dataset is None:
+        #Use default dataset
+        dataset = DEFAULT_DATASET
+        
+    cmd = [os.path.join(programdir, "__run"), dataset]
     
     env = dict(os.environ)
     env["CCC_RE"] = CONF_TIMING_TOOL
@@ -189,6 +198,7 @@ following attributes:
     basesubdir = additionalParameters["basesubdir"]
     reference = additionalParameters["reference_performance"]
     valuemap = additionalParameters["valuemap"]
+    dataset = additionalParameters["dataset"]
     dirnumber = count + 1    
 
     logger.info("Testing candidate %d", dirnumber)
@@ -208,7 +218,7 @@ following attributes:
 
         compilebenchmark(programdir, gccflags)
         
-        execution_time = timingrun(programdir)
+        execution_time = timingrun(programdir, dataset)
 
         candidate = learningframework.SuccessfulCandidate(hSet)
         candidate.executionTime = execution_time
@@ -254,7 +264,8 @@ class LearningGCC(learningframework.Learner):
         return float('inf')
       return (1.0 / candidate.speedup)
   
-  def compileProgram(self, benchmark, learn=True):
+  def compileProgram(self, benchmark, learn=True, dataset=None):
+    self.dataset = dataset
     return self.use_learning(benchmark, learn)
     
 
@@ -271,6 +282,7 @@ class LearningGCC(learningframework.Learner):
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
     additionalParameters["path"] = path
+    additionalParameters["dataset"] = self.dataset
     candidates = additionalParameters["candidates"]
     
     #Compile with default heuristics
@@ -291,7 +303,7 @@ class LearningGCC(learningframework.Learner):
 
         compilebenchmark(programdir, gccflags)
         
-        execution_time = timingrun(programdir)
+        execution_time = timingrun(programdir, self.dataset)
         
         default_candidate = learningframework.SuccessfulCandidate(hSet)
         default_candidate.speedup = 1 #This is the reference for the speedup
@@ -383,6 +395,6 @@ if __name__ == "__main__":
                     generations=options.generations)
 
     program = os.path.abspath(args[0])
-    res = l.compileProgram(program)
+    res = l.compileProgram(program, options.dataset)
     l.close()
     exit(res)
