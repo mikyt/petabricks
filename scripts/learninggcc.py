@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """Framework implementing long term learning of heuristics for the PetaBricks
 compiler
 

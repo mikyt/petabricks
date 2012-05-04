@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """This program verifies the effectiveness of the heuristic learning process by
 running a set of training programs and, after each of them, running a test
 program.
