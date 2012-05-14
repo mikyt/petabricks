@@ -430,30 +430,32 @@ class FormulaBinop(Formula):
             self.resulttype = IntegerResult
     
   def __repr__(self):
-    if not (isImmediate(self.left) and isImmediate(self.right)):
-      #Return extended representation
-      reprStr = "("+ str(self.left) +" "+ str(self.op) + " " + str(self.right)+")"
-      return reprStr
-    else:
       #Constant folding
       #Handle special cases where sintax is different
       try:
           e=eval(self.to_python_string())
-      except ZeroDivisionError:
-          #Ooop... the formula is not so good!
-          #Let's return a fallback
-          if self.resulttype == BooleanResult:
-              return "false"          
-          return "0"
+          s = str(e)
           
-      s=str(e)
+          if s == "True":
+              return "true"
+          elif s == "False":
+              return "false"
+          else:
+              return s
+          
+      except NameError:
+          #Return extended representation
+          reprStr = "("+ str(self.left) +" "+ str(self.op) + " " + str(self.right)+")"
+          return reprStr
+          
+      except ZeroDivisionError:
+          #Return a fallback
+          if self.resulttype == BooleanResult:
+              return "false"
+          else:
+              return "0"
+          
       
-      if s == "True":
-          return "true"
-      elif s == "False":
-          return "false"
-      else:
-          return s
         
   def _pythonOperator(self):
     """Return the python representation of the operator"""
