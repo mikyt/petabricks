@@ -387,6 +387,19 @@ and then by score. The score must be greater than the given threshold"""
       result = [(row[0], row[1]) for row in cur.fetchall()]
       cur.close()
       return result
+      
+  def getNBestHeuristicSetID(self, N, threshold=1):
+      """Returns (score, hsetID) pairs, ordered by score. 
+      The score must be greater than the given threshold"""
+      
+      cur = self._db.cursor()
+      query = ("SELECT score, ID FROM HeuristicSet WHERE score>=?"
+               " ORDER BY score DESC"
+               " LIMIT ?")
+      cur.execute(query, (threshold, N))
+      result = [(row[0], row[1]) for row in cur.fetchall()]
+      cur.close()
+      return result
           
       
   def getHeuristicsScoreByKind(self, kind, bestN=None):
