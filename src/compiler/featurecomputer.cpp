@@ -26,6 +26,8 @@
  *****************************************************************************/
 
 #include "featurecomputer.h"
+#include "tinyxml.h"
+#include "common/jconvert.h"
 
 #define countfeature(type) \
   feature[prefix + RIRNode::typeStr((type)) + "_count"] = \
@@ -40,33 +42,38 @@ void petabricks::ValueMap::print(std::ostream& o) const {
     o << ";  ";
   }
 }
-                                                        
-petabricks::ValueMap petabricks::get_rirnode_count_features(
-                                                      RIRBlockCopyRef bodyir,
-                                                      std::string prefix) {
-  ValueMap feature;
-  if (prefix!="") prefix=prefix+"_";
-  
-  countfeature(RIRNode::EXPR_NIL);
-  countfeature(RIRNode::EXPR_OP);
-  countfeature(RIRNode::EXPR_LIT);
-  countfeature(RIRNode::EXPR_IDENT);
-  countfeature(RIRNode::EXPR_CHAIN);
-  countfeature(RIRNode::EXPR_CALL);
-  countfeature(RIRNode::EXPR_ARGS);
-  countfeature(RIRNode::EXPR_KEYWORD);
-  countfeature(RIRNode::STMT_BASIC);
-  countfeature(RIRNode::STMT_BLOCK);
-  countfeature(RIRNode::STMT_RAW);
-  countfeature(RIRNode::STMT_LOOP);
-  countfeature(RIRNode::STMT_COND);
-  countfeature(RIRNode::STMT_SWITCH);
-  
-  return feature;
 
+petabricks::ValueMap petabricks::get_zero_valued_staticcounter_features(std::string prefix) {
+  ValueMap empty;
+  #define feature(name) empty[prefix+ #name]=0;
+  #include "featurelist.inc"
+  #undef feature
+  return empty;
 }
 
-petabricks::ValueMap petabricks::get_zero_valued_rirnode_count_features(std::string prefix) {
-                              RIRBlockCopyRef empty;
-                              return get_rirnode_count_features(empty, prefix);
-                            }
+petabricks::ValueMap petabricks::load_features_from_file(std::string filename) {
+  ValueMap values_from_file;
+  
+  TiXmlDocument doc(filename.c_str());
+	bool loaded = doc.LoadFile();
+
+  if( ! loaded) {
+    JNOTE("Unable to load features")(filename);
+    exit(10);
+  }
+  TiXmlHandle docHandle( &doc );
+	TiXmlElement* feature = docHandle.FirstChildElement("features").FirstChildElement("feature").ToElement();
+
+	while (feature) {
+    std::string name = feature->Attribute("name");
+    std::string valuetext = feature->Attribute("value");
+    double value = jalib::StringToDouble(valuetext);
+    
+    JTRACE("feature")(name)(value);
+    values_from_file[name] = value;
+    
+    //Next  
+    feature = feature->NextSiblingElement("feature");
+  }
+  return values_from_file;
+}

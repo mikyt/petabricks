@@ -92,6 +92,10 @@ class HeuristicManager : public jalib::JRefCounted {
     _useDefaultHeuristics = useDefaultHeuristics;
   }
   
+  bool usingDefaultHeuristics() {
+    return _useDefaultHeuristics;
+  }
+  
 private: 
   HeuristicPtr& internal_getDefaultHeuristic(const std::string name);
   HeuristicPtr& internal_getHeuristic(const std::string name);

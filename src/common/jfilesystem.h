@@ -59,8 +59,13 @@ namespace jalib
     
     std::string Dirname( const std::string& );
 
+    std::string GetCurrentWorkingDirectory();
+    
+    std::string JoinPath( const std::string& path1, const std::string& path2);
+    
+    bool IsAbsolutePath( const std::string& path);
+  
   }
-
 }
 
 #endif

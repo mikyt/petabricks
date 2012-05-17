@@ -40,8 +40,9 @@ public:
 ValueMap get_rirnode_count_features(RIRBlockCopyRef bodyir,
                                     std::string prefix="");
 
-ValueMap get_zero_valued_rirnode_count_features(std::string prefix="");
+ValueMap get_zero_valued_staticcounter_features(std::string prefix="");
+
+ValueMap load_features_from_file(std::string filename);
 
 }
-
 #endif

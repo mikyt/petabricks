@@ -1140,45 +1140,6 @@ std::vector<std::string> petabricks::Transform::maximalArgList(RuleFlavor rf) co
   return tmp;
 }
 
-namespace {
-  static inline void sum_partial_count_valuemap(petabricks::ValueMap& accumulator, const petabricks::ValueMap& partial){
-    for(petabricks::ValueMap::const_iterator i=partial.begin(), e=partial.end(); i!=e; ++i){
-      std::string key = i->first;
-      double count = i->second;
-      
-      double old_count;
-      petabricks::ValueMap::iterator found = accumulator.find(key);
-      if (found != accumulator.end()) {
-        old_count = found->second;
-      }
-      else {
-        //Not found
-        old_count = 0;
-      }
-       
-      accumulator[key] = old_count + count;
-    }
-  }
-}
-
-petabricks::ValueMap petabricks::Transform::computeFeatures(std::string prefix) const {
-  ValueMap result;
-  for(RuleList::const_iterator i=_rules.begin(), e=_rules.end(); i!=e; ++i) {
-    RulePtr rule = *i;
-    ValueMap tmpresult = rule->computeFeatures(prefix);
-    sum_partial_count_valuemap(result, tmpresult);
-  }
-  
-  if(_rules.begin()==_rules.end()) {
-    //No rules in the transform!
-    //We need to build an set of zero-valued features
-    RIRBlockCopyRef emptybody;
-    ValueMap tmpresult = get_rirnode_count_features(emptybody, prefix);
-    sum_partial_count_valuemap(result, tmpresult);
-  }
-  return result;
-}
-
 std::map<std::string, petabricks::TransformPtr> petabricks::Transform::theTransformMap(){
   static std::map<std::string, petabricks::TransformPtr> m;
   return m;

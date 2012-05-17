@@ -86,7 +86,9 @@ namespace pbcConfig {
   std::string theBasename;
   std::string theHeuristicsFile;
   std::string theKnowledgeBase;
+  std::string theFeatureDirectory;
   bool useDefaultHeuristics;
+  bool shouldComputeFeatures = true;
   int theNJobs = 2;
 }
 using namespace pbcConfig;
@@ -115,6 +117,16 @@ void closesubproc(FILE* p, const std::string& name) {
   JASSERT(pclose(p)==0);
 }
 
+namespace {
+  static inline std::string gccparamheuristicname(const std::string& param) {
+    return "GCCPARAM_" + param;
+  }
+  
+  static inline std::string gccflagheuristicname(const std::string& flag) {
+    return "GCCFLAG_" + flag;
+  }
+}
+
 
 /**
  * Small helper class used to output cpp files and call gcc
@@ -125,27 +137,25 @@ class OutputCode {
   StreamTreePtr _code;
   std::string   _gcccmd;
   FILE*         _gccfd;
+  
+public:
+  static std::string _gccplugin;
+  
 public:
   OutputCode(const std::string& basename, 
-             CodeGenerator& o,
-             std::string prefix="")              
+             CodeGenerator& o)              
     : _cpp(basename+".cpp")
     , _obj(basename+".o")
     , _gccfd(0) {
     
-    ValueMap empty = get_zero_valued_rirnode_count_features(prefix);
-    constructor(basename, o, empty);
-  }
-
-  
-  OutputCode(const std::string& basename, 
-             CodeGenerator& o, 
-             ValueMap& features_for_flags)              
-    : _cpp(basename+".cpp")
-    , _obj(basename+".o")
-    , _gccfd(0) {
-    
-    constructor(basename, o, features_for_flags);
+    ValueMap features;
+    if(should_compute_features()) {
+      features = get_zero_valued_staticcounter_features();
+    }
+    else {
+      features = load_features_from_file(featurefilename());
+    }
+    constructor(basename, o, features);
   }
   
   void constructor(const std::string& basename, 
@@ -161,58 +171,6 @@ public:
        << " -I\"" << theLibDir << "\""
        << " -I\"" << theRuntimeDir << "\"";
     _gcccmd = os.str();
-  }
-  
-  std::string generateCXXFLAGS(ValueMap& features_for_flags) {
-    //HeuristicManager& hm = HeuristicManager::instance();
-    std::ostringstream all_flags;
-    all_flags << CXXFLAGS;
-    all_flags << "-O";
-    //all_flags << hm.getHeuristic("OutputCode_OptimizationLevel")->evalInt(features_for_flags);
-    all_flags << "0";
-    all_flags << " ";
-
-    // -O2
-    #include "O2_flags.inc"
-    
-    all_flags << flag("-funroll-loops", features_for_flags);
-  
-    //Gcc parameters
-    all_flags << param("max-inline-insns-auto", features_for_flags);
-    all_flags << param("max-inline-insns-single", features_for_flags);
-    all_flags << param("large-function-insns", features_for_flags);
-    all_flags << param("large-function-growth", features_for_flags);
-    all_flags << param("large-unit-insns", features_for_flags);
-    all_flags << param("inline-unit-growth", features_for_flags);
-    all_flags << param("max-unroll-times", features_for_flags);
-    all_flags << param("max-unrolled-insns", features_for_flags);
-
-    return all_flags.str();  
-  }
-  
-  std::string param(std::string paramname, ValueMap& features) {
-      HeuristicManager& hm = HeuristicManager::instance();
-      std::string heuristicName = "GCCPARAM_"+paramname;
-      
-      int paramvalue = hm.getHeuristic(heuristicName)->evalInt(features);
-      return "--param " + paramname + "=" + jalib::XToString(paramvalue) + " ";
-  }
-  
-  std::string flag(std::string flagname, ValueMap& features) {
-    HeuristicManager& hm = HeuristicManager::instance();
-    std::string heuristicName = "GCCFLAG_"+flagname;
-    std::string result="";
-    
-    
-    hm.registerDefault(heuristicName, "false", Heuristic::BOOL);
-    bool useflag = hm.getHeuristic(heuristicName)->evalBool(features);
-    
-    if (useflag) {
-      result = flagname;
-      result += " ";
-    }
-    
-    return result;
   }
   
   void write() {
@@ -243,8 +201,84 @@ public:
       << "\n\n";
   }
 
+private:
+  bool should_compute_features() {
+    return shouldComputeFeatures;
+  }
+  
+  std::string featurefilename() {
+    return theFeatureDirectory + "/" + _cpp + ".xml";
+  }
+  
+std::string generateCXXFLAGS(ValueMap& features_for_flags) {
+    std::ostringstream all_flags;
+    HeuristicManager& hm = HeuristicManager::instance();
+    
+    all_flags << CXXFLAGS;
+    if (should_compute_features()) {
+      //Run the staticcounter gcc plugin to extract features from the file
+      all_flags << " -fplugin=" << _gccplugin;
+      all_flags << " -fplugin-arg-staticcounter-outputfile=" << featurefilename();
+    }
+    all_flags << " -O";
+    all_flags << hm.getHeuristic("OutputCode_OptimizationLevel")->evalInt(features_for_flags);
+    all_flags << " ";
+
+    #define flag(name) all_flags << eval_flag(name, features_for_flags);
+    #include "flags.inc"
+    #undef flag
+    
+    all_flags << eval_flag("-funroll-loops", features_for_flags);
+  
+    //Gcc parameters
+    all_flags << param("max-inline-insns-auto", features_for_flags);
+    all_flags << param("max-inline-insns-single", features_for_flags);
+    all_flags << param("large-function-insns", features_for_flags);
+    all_flags << param("large-function-growth", features_for_flags);
+    all_flags << param("large-unit-insns", features_for_flags);
+    all_flags << param("inline-unit-growth", features_for_flags);
+    all_flags << param("max-unroll-times", features_for_flags);
+    all_flags << param("max-unrolled-insns", features_for_flags);
+
+    return all_flags.str();  
+  }
+
+  std::string param(std::string paramname, ValueMap& features) {
+      HeuristicManager& hm = HeuristicManager::instance();
+      std::string heuristicName = "GCCPARAM_"+paramname;
+      
+      int paramvalue = hm.getHeuristic(heuristicName)->evalInt(features);
+      return "--param " + paramname + "=" + jalib::XToString(paramvalue) + " ";
+  }
+  
+  void disable_flag(std::string& flag) {
+    if(flag.substr(0, 5) == "-fno-") {
+      flag.replace(0, 5, "-f");
+      return;
+    }
+
+    flag.replace(0, 2, "-fno-");    
+  }
+  
+  std::string eval_flag(const std::string& flagname, const ValueMap& features) {
+    HeuristicManager& hm = HeuristicManager::instance();
+    std::string heuristicName = gccflagheuristicname(flagname);
+    std::string result="";
+    
+    bool useflag = hm.getHeuristic(heuristicName)->evalBool(features);
+    
+    result = flagname;
+    if ( ! useflag) {
+      //Disable optimization
+      disable_flag(result);
+    }
+    
+    result += " ";
+    return result;
+  }
 };
 
+std::string OutputCode::_gccplugin = "";
 
 /**
  * Collection of all the output source files of the compiler
@@ -322,18 +356,18 @@ public:
     o << "clean_obj:\n";
     o << "\trm -f *.o\n\n";
     
+    o << "clean_dbg:\n";
+    o << "\trm -f *.dot\n\n";
+    
     o << "clean_temp:\n";
     o << "\trm -f *~ *.bak *.tmp *.temp\n\n";
     
-    o << "clean: clean_bin clean_obj clean_temp\n";
+    o << "clean_other:\n";
+    o << "\trm -f *.xml\n\n";
+    
+    o << "clean: clean_bin clean_obj clean_temp clean_dbg clean_other\n";
   }
 };
-
-namespace {
-  static inline std::string gccparamheuristicname(const std::string param) {
-    return "GCCPARAM_" + param;
-  }
-}
 
 void loadDefaultHeuristics() {
   HeuristicManager& hm = HeuristicManager::instance();
@@ -342,7 +376,11 @@ void loadDefaultHeuristics() {
 
   hm.registerDefault("OutputCode_OptimizationLevel", "0", Heuristic::INT, 0, 3);
   
-  hm.registerDefault("-funroll-loops", "false", Heuristic::BOOL);
+  hm.registerDefault(gccflagheuristicname("-funroll-loops"), "false", Heuristic::BOOL);
+  
+  #define flag(name) hm.registerDefault(gccflagheuristicname(name), "false", Heuristic::BOOL);
+  #include "flags.inc"
+  #undef flag
   
   hm.registerDefault(gccparamheuristicname("max-inline-insns-auto"), "40", Heuristic::INT, 10, 100);
   hm.registerDefault(gccparamheuristicname("max-inline-insns-single"), "400", Heuristic::INT, 100, 1000);
@@ -369,6 +407,8 @@ void findMainTransform(const TransformListPtr& t) {
 }
 
 int main( int argc, const char ** argv){
+  //Init static class variable
+  OutputCode::_gccplugin = jalib::Filesystem::GetProgramDir()+ "/" STATICCOUNTER_GCC_PLUGIN;
 
   /*
   #ifdef HAVE_OPENCL
@@ -407,6 +447,7 @@ int main( int argc, const char ** argv){
   args.param("heuristics", theHeuristicsFile).help("config file containing the (partial) set of heuristics to use");
   args.param("defaultheuristics", useDefaultHeuristics).help("use the default heuristics for every choice");
   args.param("knowledge", theKnowledgeBase).help("file containing the long-term learning knowledge base");
+  args.param("featuredir", theFeatureDirectory).help("directory containing the features to use for long-term learning");
   
   if(args.param("version").help("print out version number and exit") ){
     std::cerr << PACKAGE " compiler (pbc) v" VERSION " " REVISION_LONG << std::endl;
@@ -431,6 +472,18 @@ int main( int argc, const char ** argv){
   if(theOutputInfo.empty()) theOutputInfo = theOutputBin + ".info";
   if(theObjectFile.empty()) theObjectFile = theOutputBin + ".o";
   if(theKnowledgeBase.empty()) theKnowledgeBase = DBManager::defaultDBFileName();
+  if(theFeatureDirectory.empty()) {
+    theFeatureDirectory = ".";
+    shouldComputeFeatures = true;
+  }
+  else {
+    if ( ! jalib::Filesystem::IsAbsolutePath(theFeatureDirectory)) {
+      std::string cwd = jalib::Filesystem::GetCurrentWorkingDirectory();
+      theFeatureDirectory = jalib::Filesystem::JoinPath(cwd, theFeatureDirectory);
+    }
+    
+    shouldComputeFeatures = false;
+  }
   
   HeuristicManager::init(theKnowledgeBase);
   if(! theHeuristicsFile.empty()) HeuristicManager::instance().loadFromFile(theHeuristicsFile);
@@ -474,8 +527,7 @@ int main( int argc, const char ** argv){
   CodeGenerator o(header, NULL);
   
   for(TransformList::iterator i=t->begin(); i!=t->end(); ++i){
-    ValueMap transform_features = (*i)->computeFeatures("Transform");
-    ccfiles.push_back(OutputCode((*i)->name(), o, transform_features));
+    ccfiles.push_back(OutputCode((*i)->name(), o));
     (*i)->generateCode(o);
   }
 
@@ -491,7 +543,7 @@ int main( int argc, const char ** argv){
   o.createTunable(true, "system.size.blocksize",  "opencl_blocksize", 16, 0, 25); // 0 means not using local memory
 #endif
   o.cg().endGlobal();
-  ccfiles.push_back(OutputCode(GENMISC, o, "Transform"));
+  ccfiles.push_back(OutputCode(GENMISC, o));
   o.outputTunables(o.os());
   o.comment("A hook called by PetabricksRuntime");
   o.beginFunc("petabricks::PetabricksRuntime::Main*", "petabricksMainTransform");

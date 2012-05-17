@@ -58,7 +58,7 @@ def parseCmdline(petabricks_path):
     parser.add_option("--errorfile",
                       type="string",
                       help="file containing the log of errors",
-                      default="error-log.dat")
+                      default="log.txt")
     parser.add_option("--maxtuningsize",
                       type="int",
                       help="maximum size of the input to be used tuning a candidate",
@@ -146,8 +146,8 @@ True, than it is also generated"""
 
 
 class HeuristicsGraphDataGenerator(object):
-  def __init__(self, heuristicKinds):
-    self._db = heuristicdb.HeuristicDB()
+  def __init__(self, heuristicKinds, knowledge=None):
+    self._db = heuristicdb.HeuristicDB(knowledge)
     self._heuristicKinds = heuristicKinds
 
     #Output files (one for each heuristic kind)
@@ -308,7 +308,7 @@ def main():
                                         min_trial_number=options.mintrialnumber,
                                         knowledge=options.knowledge)
   tester = TestRunner(compiler, options.maxtestsize, options.maxtesttime)  
-  hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS)
+  hgdatagen = HeuristicsGraphDataGenerator(HEURISTIC_KINDS, options.knowledge)
 
   #Open files
   trainingset = open(options.trainingset, "r")

@@ -228,3 +228,31 @@ std::string jalib::Filesystem::Dirname( const std::string& str) {
   return str.substr ( 0,lastSlash );
 }
 
+std::string jalib::Filesystem::GetCurrentWorkingDirectory() {
+  #define BUF_SIZE 1024+1
+  char buf[BUF_SIZE];
+  
+  char * allright = getcwd(buf, BUF_SIZE);
+  if( ! allright) {
+    JNOTE("Unable to obtain current working directory");
+    abort();
+  }
+  
+  return std::string(buf);
+  
+  #undef BUF_SIZE
+}
+
+std::string jalib::Filesystem::JoinPath( const std::string& path1, const std::string& path2) {
+      JASSERT(path2[0] != '/')("Path2 is an absolute path. It cannot be joined")(path1)(path2);
+      char last_char = path1[path1.size()-1];
+      if(last_char == '/') {
+        return path1 + path2;
+      }
+      
+      return path1 + "/" + path2;
+}
+
+bool jalib::Filesystem::IsAbsolutePath( const std::string& path) {
+      return path[0] == '/';
+}

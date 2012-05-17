@@ -280,7 +280,6 @@ public:
 
   void addInitCall(const std::string& s) { _initCalls.push_back(s); }
   
-  ValueMap computeFeatures(std::string prefix="") const;
 protected:
   static std::map<std::string, TransformPtr> theTransformMap();
 

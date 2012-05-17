@@ -18,6 +18,7 @@ CONF_MIN_TRIAL_NUMBER = 16
 CONF_PICK_BEST_N = 10
 NUM_ELITE_BEST= 1
 NUM_ELITE_MOST_FREQUENT = 1
+NUM_GENERATIONS = 3
 #------------------------------------------
 
 def import_object(moduleName, objectName):
@@ -169,7 +170,10 @@ class Learner(object):
   def __init__(self, heuristicSetFileName = None, 
                use_mapreduce = False, 
                min_trial_number=None,
-               knowledge=None):
+               knowledge=None,
+               generations=None):
+    if generations == None:
+        self.num_generations = NUM_GENERATIONS
     self._heuristicManager = HeuristicManager(heuristicSetFileName)
     if min_trial_number:
         self._minTrialNumber = min_trial_number
@@ -366,6 +370,18 @@ result inside the candidates list taken from the additional parameters"""
 
 
   def use_learning(self, benchmark, learn=True):
+      if not learn:
+          return self.use_learning_on_one_generation(benchmark, learn)
+          
+      for generation in xrange(self.num_generations):
+          logger.info("Testing generation %d/%d", generation+1, self.num_generations)
+          result = self.use_learning_on_one_generation(benchmark, learn)
+          if result != 0:
+              return result
+          
+      return result
+      
+  def use_learning_on_one_generation(self, benchmark, learn=True):
     logger.info("Using best heuristics on: %s", benchmark)
 
     #Init variables

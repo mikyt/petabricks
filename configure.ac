@@ -452,6 +452,8 @@ do
                  [AC_MSG_RESULT([no]);      LDFLAGS="$save_LDFLAGS"])
 done
 
+AC_DEFINE([STATICCOUNTER_GCC_PLUGIN], ["staticcounter/staticcounter.so"], ["The GCC plugin performing static code analysis"])
+
 ################################################################################
 ################################################################################
 ################################################################################

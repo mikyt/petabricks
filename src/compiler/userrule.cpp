@@ -1057,7 +1057,7 @@ void petabricks::UserRule::generateTrampCode(Transform& trans, CodeGenerator& o,
     if(isSingleElement()){
       trans.markSplitSizeUse(o);
       HeuristicPtr blockNumberHeur = HeuristicManager::instance().getHeuristic("UserRule_blockNumber");
-      ValueMap features = get_rirnode_count_features(_bodyir[flavor], "UserRule");
+      ValueMap features; // = get_rirnode_count_features(_bodyir[flavor], "UserRule");
       unsigned int blockNumber = blockNumberHeur->evalInt(features); /**< The number of blocks the loop will be
                                                                     * splitted into */
       JTRACE("LOOP BLOCKING")(blockNumber);
@@ -2087,8 +2087,4 @@ petabricks::RegionList petabricks::UserRule::getNonSelfDependentRegions() {
   }
   
   return list;
-}
-
-petabricks::ValueMap petabricks::UserRule::computeFeatures(std::string prefix) { 
-  return get_rirnode_count_features(getBody(), prefix); 
 }

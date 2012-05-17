@@ -24,6 +24,8 @@ CONF_TIMEOUT = 60*30
 CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 STATIC_INPUT_PREFIX = "learning_compiler_static"
 NUM_TIMING_TESTS = 5
+CONF_GCC_PLUGIN = "/home/mikyt/programmi/staticcounter/staticcounter.so"
+NUM_GENERATIONS=3
 #----------------------------------------------
 
 
@@ -48,7 +50,7 @@ def parseCmdline():
     parser.add_option("--errorfile",
                         type="string",
                         help="file containing the log of errors",
-                        default="error-log.dat")
+                        default="log.txt")
     parser.add_option("--maxtuningsize",
                         type="int",
                         help="maximum size of the input to be used tuning a candidate",
@@ -77,6 +79,11 @@ def parseCmdline():
                       help=("file containing the long-term learning knowledge "
                             "base"),
                       default=None)
+    parser.add_option("--generations",
+                      type="int",
+                      help=("number of generations to be used for the learning "
+                            "process (default %d)") % NUM_GENERATIONS,
+                      default=NUM_GENERATIONS)
                             
     return parser.parse_args()
 
@@ -143,6 +150,7 @@ following attributes:
     threads = additionalParameters["threads"]
     static_input_name = additionalParameters["static_input_name"]
     knowledge = additionalParameters["knowledge"]
+    feature_directory = additionalParameters["feature_directory"]
     dirnumber = count + 1    
 
     #The tuning has to reach the same size as the reference performance, but 
@@ -170,7 +178,9 @@ following attributes:
                                              heuristics=heuristicsFile,
                                              jobs=threads,
                                              timeout=CONF_TIMEOUT,
-                                             knowledge=knowledge)
+                                             knowledge=knowledge,
+                                             feature_directory=feature_directory)
+                                             
     if status != 0:
         #Compilation has failed!
         #Take the data about the heuristics from the input heuristics file
@@ -183,7 +193,6 @@ following attributes:
                        status, dirnumber)
         logger.warning(hSet)
         return learningframework.FailedCandidate(hSet, assignScores = False)
-
 
     #Autotune
     try:
@@ -238,11 +247,12 @@ class LearningCompiler(learningframework.Learner):
   
   def __init__(self, pbcExe, heuristicSetFileName = None, threads = None, n=None, 
                maxTuningTime=None, use_mapreduce=False,
-               min_trial_number=None, knowledge=None):
+               min_trial_number=None, knowledge=None, generations=None):
     super(LearningCompiler, self).__init__(heuristicSetFileName, 
                                            use_mapreduce=use_mapreduce,
                                            min_trial_number=min_trial_number,
-                                           knowledge=knowledge)
+                                           knowledge=knowledge,
+                                           generations=generations)
     
     self._pbcExe = pbcExe
     self._threads = threads
@@ -298,6 +308,7 @@ class LearningCompiler(learningframework.Learner):
     basename, ext = os.path.splitext(basenameExt)
     basesubdir = os.path.join(path,basename+".tmp")
     static_input_name = os.path.join(basesubdir, STATIC_INPUT_PREFIX)
+    outDir = os.path.join(basesubdir, "0")
     
     additionalParameters["basesubdir"] = basesubdir
     additionalParameters["basename"] = basename
@@ -307,10 +318,10 @@ class LearningCompiler(learningframework.Learner):
     additionalParameters["threads"] = self._threads
     additionalParameters["max_tuning_time"] = self.maxtuningtime
     additionalParameters["knowledge"] = self.knowledge
+    additionalParameters["feature_directory"] = os.path.join(outDir, basename+".obj")
     candidates = additionalParameters["candidates"]
     
     #Compile with default heuristics
-    outDir = os.path.join(basesubdir, "0")
     if not os.path.isdir(outDir):
       #Create the output directory
       os.makedirs(outDir)
@@ -385,7 +396,6 @@ class LearningCompiler(learningframework.Learner):
             available_features = self._get_available_features(benchmark, name)
             neededheur = heur.derive_needed_heuristic(available_features)
             self._neededHeuristics.append(neededheur)        
-                
         return 0        
     except TimingRunError, e:
         logger.warning("Default candidate failed during testing with static "
@@ -492,7 +502,8 @@ if __name__ == "__main__":
                          threads=options.threads,
                          use_mapreduce=options.usemapreduce,
                          min_trial_number=options.mintrialnumber,
-                         knowledge=options.knowledge)
+                         knowledge=options.knowledge,
+                         generations=options.generations)
 
     program = os.path.abspath(args[0])
     l.compileProgram(program)

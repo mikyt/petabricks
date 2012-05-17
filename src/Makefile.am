@@ -109,7 +109,7 @@ libpbcommon_a_SOURCES =  \
 
 libpbcompiler_a_LFLAGS =
 libpbcompiler_a_YFLAGS = -d
-libpbcompiler_a_CXXFLAGS = -I. -I$(srcdir)/compiler
+libpbcompiler_a_CXXFLAGS = -I. -I$(srcdir)/compiler -I$(srcdir)/staticcounter
 libpbcompiler_a_SOURCES = \
   compiler/choicedepgraph.cpp \
   compiler/choicegrid.cpp \
@@ -183,7 +183,7 @@ libpbruntime_a_SOURCES =  \
 libpbmain_a_CXXFLAGS = -Iruntime
 libpbmain_a_SOURCES = runtime/redirectmain.cpp
 
-pbc_CXXFLAGS = -Icompiler
+pbc_CXXFLAGS = -Icompiler 
 pbc_SOURCES = compiler/pbc.cpp
 pbc_LDADD = libpbcompiler.a libpbcommon.a
 
@@ -214,10 +214,13 @@ CLEANFILES = libpbcompiler_a-maximalexer.cpp libpbcompiler_a-maximaparser.cpp li
              libpbcompiler_a-maximaparser.output libpbcompiler_a-pbparser.output libpbcompiler_a-ruleirparser.output \
              libpbruntime_a-matrixreader.cpp compiler/O2_flags.inc
 
-compiler/O2_flags.inc:
-	gcc -O2 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/all_flags << flag(\"\1\", features_for_flags);/" > compiler/O2_flags.inc
+compiler/flags.inc:
+	gcc -O3 -Q --help=optimizers | grep enabled | sed "s/\s*\(-f[-a-z0-9]*\)\s*\[enabled\]/flag(\"\1\")/" > compiler/flags.inc
 
-compiler/pbc.cpp: compiler/O2_flags.inc
+staticcounter:
+	make -C staticcounter/
+
+compiler/pbc.cpp: compiler/flags.inc staticcounter staticcounter/featurelist.inc
 
 #copy bison headers
 maximaparser.h: libpbcompiler_a-maximaparser.h
@@ -232,3 +235,4 @@ $(srcdir)/compiler/maximalexer.lpp: maximaparser.h
 $(srcdir)/compiler/pblexer.lpp:     pbparser.h
 $(srcdir)/compiler/ruleirlexer.lpp: ruleirparser.h
 
+.PHONY:	staticcounter
