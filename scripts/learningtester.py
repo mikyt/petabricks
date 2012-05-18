@@ -337,6 +337,11 @@ def main():
     src=program+".pbcc"
     binary=program
 
+    if src == testProgram:
+        logger.info("Test program found in the training set. Skipping it to "
+                    "allow leave-one-out cross-validation")
+        continue
+    
     print "Learning from "+trainingprogram
 
     try:

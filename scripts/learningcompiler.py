@@ -25,7 +25,8 @@ CONF_HEURISTIC_FILE_NAME = "heuristics.txt"
 STATIC_INPUT_PREFIX = "learning_compiler_static"
 NUM_TIMING_TESTS = 5
 CONF_GCC_PLUGIN = "/home/mikyt/programmi/staticcounter/staticcounter.so"
-NUM_GENERATIONS=3
+NUM_GENERATIONS = 3
+DEFAULT_TEST_MATRIX_SIZE = 256
 #----------------------------------------------
 
 
@@ -298,6 +299,27 @@ class LearningCompiler(learningframework.Learner):
     self._availablefeatures = None
 
     return self.use_learning(benchmark, learn)
+  
+  
+  def _tune_default_candidate(self, binary, additionalParameters):
+      try:
+          logger.debug("Tuning default candidate")
+          tuned_candidate = sgatuner.autotune_withparams(binary, 
+                                                   n=self._n, 
+                                                   max_time=self._maxTuningTime,
+                                                   delete_output_dir=True)
+      
+          max_tuned_size = tuned_candidate.maxMatrixSize()
+        
+      except tunerwarnings.AlwaysCrashes:
+          logger.error("Autotuning with default heuristics always crashes!")
+          if self._n:
+              max_tuned_size = self._n
+          else:
+              max_tuned_size = DEFAULT_TEST_MATRIX_SIZE
+
+      additionalParameters["max_tuning_size"] = max_tuned_size
+      return max_tuned_size
     
 
   def _setup(self, benchmark, additionalParameters):
@@ -336,23 +358,8 @@ class LearningCompiler(learningframework.Learner):
       logger.error("Compile FAILED with default heuristics (status: %d)- "
                    "Compilation aborted", (status))
       return status
-
-    #Autotune
-    try:
-        logger.debug("Tuning default candidate")
-        tuned_candidate = sgatuner.autotune_withparams(binary, 
-                                                   n=self._n, 
-                                                   max_time=self._maxTuningTime,
-                                                   delete_output_dir=True)
       
-        max_tuned_size = tuned_candidate.maxMatrixSize()
-        additionalParameters["max_tuning_size"] = max_tuned_size
-        
-    except tunerwarnings.AlwaysCrashes:
-        logger.error("Autotuning with default heuristics always crashes!")
-        additionalParameters["max_tuning_size"] = self._n
-    
-    
+    max_tuned_size = self._tune_default_candidate(binary, additionalParameters)
     
     if self._n:
         max_test_size = self._n 
