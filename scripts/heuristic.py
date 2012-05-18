@@ -173,7 +173,6 @@ Everything else will be None"""
       (name : value)"""
       formulaObj = maximaparser.parse(str(self._formula))
       pstring = formulaObj.to_python_string()
-      logger.debug("Evaluating: %s on %s", pstring, valuemap)
       res = eval(pstring, valuemap)
       del valuemap['__builtins__'] #Added by eval
      
