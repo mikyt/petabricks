@@ -33,7 +33,7 @@ def timeoutKiller(subproc, timeout):
     
 def compileBenchmark(pbc, src, binary=None, info=None, jobs=None, 
                      heuristics=None, timeout=None, defaultHeuristics=False,
-                     knowledge=None):
+                     knowledge=None, feature_directory=None):
     if not os.path.isfile(src):
       raise IOError("%s is not a file" % src)
     
@@ -52,6 +52,8 @@ def compileBenchmark(pbc, src, binary=None, info=None, jobs=None,
       cmd.append("--defaultheuristics")
     if knowledge:
         cmd.append("--knowledge=%s" % knowledge)
+    if feature_directory:
+        cmd.append("--featuredir=%s" % feature_directory)
         
     cmd.append(src)
     

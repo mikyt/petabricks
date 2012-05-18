@@ -10,7 +10,7 @@ import maximaparser
 
 from optparse import OptionParser
 
-NEUTRALITY_THRESHOLD = 0.90
+NEUTRALITY_THRESHOLD = 0.95
 
 logger = logging.getLogger(__name__)
 pprinter = pprint.PrettyPrinter()
