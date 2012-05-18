@@ -22,8 +22,5 @@ def configureLogging(errorfile):
     formatter = logging.Formatter('%(asctime)s - %(name)s - '
                                   '%(levelname)s - %(message)s')
     fh.setFormatter(formatter)
-    # create console handler
-    ch = logging.StreamHandler()
     # add the handlers to logger
-    rootLogger.addHandler(ch)
     rootLogger.addHandler(fh)
