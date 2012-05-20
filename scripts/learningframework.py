@@ -18,6 +18,7 @@ CONF_MIN_TRIAL_NUMBER = 16
 CONF_PICK_BEST_N = 10
 NUM_ELITE_BEST= 1
 NUM_ELITE_MOST_FREQUENT = 1
+NUM_ELITE_BEST_SET = 1
 NUM_GENERATIONS = 3
 #------------------------------------------
 
@@ -174,6 +175,9 @@ class Learner(object):
                generations=None):
     if generations == None:
         self.num_generations = NUM_GENERATIONS
+    else:
+        self.num_generations = generations
+        
     self._heuristicManager = HeuristicManager(heuristicSetFileName)
     if min_trial_number:
         self._minTrialNumber = min_trial_number
@@ -328,41 +332,54 @@ result inside the candidates list taken from the additional parameters"""
     neededHeuristics = additionalParameters["neededHeuristics"]
 
     allHSets = []
-
-    elite = self._generateHSetsByElitism(neededHeuristics, NUM_ELITE_BEST, 
+    elite = []
+    
+    best_subsets = self._getBestHeuristicSubsets(neededHeuristics, NUM_ELITE_BEST_SET)
+    for hset in best_subsets:
+        #These are subsets of the needed heuristics: they might be incomplete!
+        hset.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
+        
+    elite.extend(best_subsets)
+    
+    from_best = self._generateHSetsByElitism(neededHeuristics, NUM_ELITE_BEST, 
                                          self._db.getBestNHeuristics)
-    allHSets.extend(elite)
-    elite = self._generateHSetsByElitism(neededHeuristics, 
+    elite.extend(from_best)
+    
+    from_most_frequent = self._generateHSetsByElitism(neededHeuristics, 
                                          NUM_ELITE_MOST_FREQUENT, 
                                          self._db.getNMostFrequentHeuristics)
-    allHSets.extend(elite)
-    
+    elite.extend(from_most_frequent)
 
-    numGenerated = len(allHSets)
+
+    #Generate the remaining needed heuristic sets
+    other_hsets = []
+    numGenerated = len(elite)
     numNeeded = self._minTrialNumber - numGenerated
-    best_subsets = self._getBestHeuristicSubsets(neededHeuristics, numNeeded)
-    allHSets.extend(best_subsets)
-    logger.debug("Retrieved %d best subsets from DB", len(best_subsets))
+    best = self._getBestHeuristicSubsets(neededHeuristics, numNeeded)
+    other_hsets.extend(best)
     
-    #Generate the ramaining needed (empty) heuristicSets
-    numGenerated = len(allHSets)
+    #Generate the remaining needed (empty) heuristic sets
+    numGenerated = len(elite) + len(other_hsets)
     numNeeded = self._minTrialNumber - numGenerated
     for _ in range(numNeeded):
-      allHSets.append(HeuristicSet())
+      other_hsets.append(HeuristicSet())
 
-    #Complete heuristic sets
+    #Complete and evolve non-elite heuristic sets
+    for hSet in other_hsets:
+      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)  
+      hSet.evolve(self._get_available_features(benchmark))
+      
+    #Prepare the list of all hsets
+    allHSets.extend(elite)
+    allHSets.extend(other_hsets)
+    
+    #Ensure there are no duplicates
     count=0
     for hSet in allHSets:
-      logger.debug("Completing %s", hSet)
-      hSet.complete(neededHeuristics, self._db, CONF_PICK_BEST_N)
-      
-      hSet.evolve(self._get_available_features(benchmark))
-
       previousHSets = allHSets[:count]
       hSet.ensureUnique(previousHSets, self._get_available_features(benchmark))
-
       count = count + 1
-
+      
     if self.use_mapreduce:
         self._test_with_mapreduce(benchmark, allHSets, additionalParameters)
     else:
