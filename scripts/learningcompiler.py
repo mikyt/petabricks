@@ -318,6 +318,13 @@ class LearningCompiler(learningframework.Learner):
           else:
               max_tuned_size = DEFAULT_TEST_MATRIX_SIZE
 
+      except:
+          logger.exception("Unexpected error during autotuning of %s!", binary)
+          if self._n:
+              max_tuned_size = self._n
+          else:
+              max_tuned_size = DEFAULT_TEST_MATRIX_SIZE
+              
       additionalParameters["max_tuning_size"] = max_tuned_size
       return max_tuned_size
     
