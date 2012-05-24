@@ -320,10 +320,7 @@ class FormulaBool(Formula):
       return "false"
       
   def evolve(self, unused_min_val=None, unused_max_val=None):
-    if random.random() < 0.5:
-      self.value = False
-    else:
-      self.value = True
+    self.value = not self.value
     return True  
     
       
