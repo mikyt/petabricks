@@ -239,7 +239,9 @@ following attributes:
         logger.warning("Tuning of candidate %d FAILED: compilation produced an "
                        "executable file that cannot be run!", dirnumber)
         return learningframework.FailedCandidate(hSet, assignScores = True)
-    
+    except:
+        logger.exception("Unexpected error during autotuning of %s!", binary)
+        return learningframework.FailedCandidate(hSet, assignScores = True)
     
     
     
