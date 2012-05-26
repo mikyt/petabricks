@@ -238,7 +238,7 @@ The candidates should already be ordered (from the best one to the worst one)"""
             points = candidate.speedup
             self._db.updateHSetWeightedScore(h_set, points)
         else:
-            self._db.markAsUsed(h_set, uses=1)
+            self._db.updateHSetWeightedScore(h_set, points=0, uses=1)
 
 
         count = count +1
