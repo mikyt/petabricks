@@ -342,7 +342,7 @@ class HeuristicDB:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, ?, ?)"
       logger.debug("The heuristic is actually new!")
-      cur.execute(query, (kindID, heuristic.formula, heuristic.uses, 
+      cur.execute(query, (kindID, heuristic.formula, newUses, 
                           (newScore*newValidUses)/newUses))
     self.commit()
     cur.close()
