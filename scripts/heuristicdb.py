@@ -196,9 +196,9 @@ class HeuristicDB:
     self.undefer_commits()
     self.commit()
       
-  def updateHSetWeightedScore(self, heuristicSet, points):
+  def updateHSetWeightedScore(self, heuristicSet, points, uses=None):
       self.defer_commits()
-      self._updateHSetWeightedScore_asSingleHeuristics(heuristicSet, points)
+      self._updateHSetWeightedScore_asSingleHeuristics(heuristicSet, points, uses=uses)
       self._updateHSetScore(heuristicSet, points)
       self.undefer_commits()
       self.commit()
@@ -304,12 +304,12 @@ class HeuristicDB:
     finally:
         cur.close()
 
-  def _updateHSetWeightedScore_asSingleHeuristics(self, heuristicSet, points):
+  def _updateHSetWeightedScore_asSingleHeuristics(self, heuristicSet, points, uses=None):
       for name, heuristic in heuristicSet.iteritems():
-          self.updateHeuristicWeightedScore(heuristic, points)
+          self.updateHeuristicWeightedScore(heuristic, points, uses)
       
   
-  def updateHeuristicWeightedScore(self, heuristic, points):
+  def updateHeuristicWeightedScore(self, heuristic, points, uses=None):
     """The new score of the heuristic is given by the weighted average of the 
     current score and the new score.
     The weight is modified in such a way that only valid uses actively 
@@ -318,8 +318,12 @@ class HeuristicDB:
     finalScore = ((oldScore*oldUses) + (newScore*newValidUses)) / (oldUses+newUses)
     finalUses = oldUses + newUses"""
     newScore = points
-    newValidUses = self._valid_uses(heuristic)
-    newUses = heuristic.uses
+    if uses:
+        newValidUses = uses
+        newUses = uses
+    else:
+        newValidUses = self._valid_uses(heuristic)
+        newUses = heuristic.uses
     
     logger.debug("UPDATING Heuristic")
     logger.debug(heuristic)
@@ -338,7 +342,7 @@ class HeuristicDB:
       #There was no such heuristic in the DB: let's add it
       query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, ?, ?)"
       logger.debug("The heuristic is actually new!")
-      cur.execute(query, (kindID, heuristic.formula, heuristic.uses, 
+      cur.execute(query, (kindID, heuristic.formula, newUses, 
                           (newScore*newValidUses)/newUses))
     self.commit()
     cur.close()
