@@ -87,6 +87,7 @@ namespace pbcConfig {
   std::string theHeuristicsFile;
   std::string theKnowledgeBase;
   std::string theFeatureDirectory;
+  bool useO0AsDefault = false;
   bool useDefaultHeuristics;
   bool shouldComputeFeatures = true;
   int theNJobs = 2;
@@ -369,12 +370,12 @@ public:
   }
 };
 
-void loadDefaultHeuristics() {
+void loadDefaultHeuristics(bool useO0) {
   HeuristicManager& hm = HeuristicManager::instance();
   
   hm.registerDefault("UserRule_blockNumber", "2", Heuristic::INT, 2, 15);;
 
-  hm.registerDefault("OutputCode_OptimizationLevel", "0", Heuristic::INT, 0, 3);
+  hm.registerDefault("OutputCode_OptimizationLevel", useO0?"0":"2" , Heuristic::INT, 0, 3);
   
   hm.registerDefault(gccflagheuristicname("-funroll-loops"), "false", Heuristic::BOOL);
   
@@ -448,7 +449,8 @@ int main( int argc, const char ** argv){
   args.param("defaultheuristics", useDefaultHeuristics).help("use the default heuristics for every choice");
   args.param("knowledge", theKnowledgeBase).help("file containing the long-term learning knowledge base");
   args.param("featuredir", theFeatureDirectory).help("directory containing the features to use for long-term learning");
-  
+  args.param("O0", useO0AsDefault).help("default optimization level for the underlying GCC");
+ 
   if(args.param("version").help("print out version number and exit") ){
     std::cerr << PACKAGE " compiler (pbc) v" VERSION " " REVISION_LONG << std::endl;
     return 1;
@@ -489,7 +491,7 @@ int main( int argc, const char ** argv){
   if(! theHeuristicsFile.empty()) HeuristicManager::instance().loadFromFile(theHeuristicsFile);
   if(useDefaultHeuristics) HeuristicManager::instance().useDefaultHeuristics(true);
   
-  loadDefaultHeuristics();
+  loadDefaultHeuristics(useO0AsDefault);
   
   int rv = mkdir(theObjDir.c_str(), 0755);
   if(rv!=0 && errno==EEXIST)
