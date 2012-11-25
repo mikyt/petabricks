@@ -37,7 +37,7 @@ class TestNeededHeuristic(unittest.TestCase):
         needed = NeededHeuristic(kind, features, formula.IntegerResult, 
                                  min_val=2, max_val=3)
         
-        heur = needed.derive_heuristic("a+b")
+        heur = needed.derive_heuristic("a+b", None)
         
         self.assertEqual(heur.name, needed.name)
         self.assertEqual(heur.min_val, needed.min_val)
@@ -105,13 +105,16 @@ class TestHeuristic(unittest.TestCase):
     def test_evolve(self):
         formulastr = "a+5"
         kind = "Evolve"
-        heur = Heuristic(kind, formulastr, formula.IntegerResult)
+        originalID = 1
+        heur = Heuristic(kind, formulastr, formula.IntegerResult, ID=originalID)
         
         features = ["a","b","c"]
         
         heur.evolve(features)
         
         self.assertNotEqual(formula, heur.formula)
+        self.assertEqual(heur.derivesFrom, originalID)
+        self.assertEqual(heur.ID, -1)
         
     def test_boolean(self):
         h = Heuristic("SomeKind", "true", formula.BooleanResult)

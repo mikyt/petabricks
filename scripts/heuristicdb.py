@@ -47,8 +47,10 @@ class HeuristicDB:
                                         "'name' TEXT UNIQUE, "
                                         "'resulttype' TEXT)")
     self._createTable("Heuristic", "('ID' INTEGER PRIMARY KEY AUTOINCREMENT, "
-                      "'kindID' INTEGER, 'formula' TEXT, "
-                      "'score' FLOAT, 'useCount' INTEGER,"
+                      "'kindID' INTEGER, 'formula' TEXT, 'score' FLOAT, "
+                      "'useCount' INTEGER, 'derivesFrom' INTEGER, "
+                      "FOREIGN KEY ('derivesFrom') REFERENCES 'Heuristic' "
+                      "('ID'), "
                       "FOREIGN KEY ('kindID') REFERENCES 'HeuristicKind' ('ID')"
                       "ON DELETE CASCADE ON UPDATE CASCADE)")
     self._createTable("HeuristicSet", "('ID' INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -130,6 +132,18 @@ class HeuristicDB:
     return self.getHeuristicKindID(kindName)
   
   
+  def storeHeuristic (self, kindID, formula, useCount, score, 
+                      derivesFrom=None):
+      if derivesFrom:
+          derivesFrom_value = derivesFrom
+      else:
+          derivesFrom_value = "NULL"  
+      query = "INSERT INTO Heuristic (kindID, formula, useCount, score, derivesFrom) VALUES (?, ?, 1, ?, ?)"
+      cur = self._db.cursor()
+      cur.execute(query, (kindID, formula, score, derivesFrom_value))
+      self.commit()
+      cur.close()
+    
   def increaseHeuristicScore(self, heuristic, score):
     kindID=self.storeHeuristicKind(heuristic.name, heuristic.resulttype) 
     cur = self._db.cursor()
@@ -137,8 +151,9 @@ class HeuristicDB:
     cur.execute(query, (score, kindID, heuristic.formula))
     if cur.rowcount == 0:
       #There was no such heuristic in the DB: probably it was taken from the defaults
-      query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, ?)"
-      cur.execute(query, (kindID, heuristic.formula, score))
+      self.defer_commits()
+      self.storeHeuristic(kindID, heuristic.formula, 1, score, heuristic.derivesFrom)
+      self.undefer_commits()
     self.commit()
     cur.close()
   
@@ -155,8 +170,9 @@ class HeuristicDB:
     cur.execute(query, (count, kindID, heuristic.formula))
     if cur.rowcount == 0:
       #There was no such heuristic in the DB: let's add it
-      query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, 1, 0)"
-      cur.execute(query, (kindID, heuristic.formula))
+      self.defer_commits()
+      self.storeHeuristic(kindID, heuristic.formula, 1, 0, heuristic.derivesFrom)
+      self.undefer_commits()
     self.commit()
     cur.close()
     
@@ -340,40 +356,40 @@ class HeuristicDB:
                         heuristic.formula))
     if cur.rowcount == 0:
       #There was no such heuristic in the DB: let's add it
-      query = "INSERT INTO Heuristic (kindID, formula, useCount, score) VALUES (?, ?, ?, ?)"
+      self.defer_commits()
+      self.storeHeuristic (kindID, heuristic.formula, newUses, (newScore*newValidUses)/newUses, derivesFrom=heuristic.derivesFrom)
+      self.undefer_commits()
       logger.debug("The heuristic is actually new!")
-      cur.execute(query, (kindID, heuristic.formula, newUses, 
-                          (newScore*newValidUses)/newUses))
     self.commit()
     cur.close()
     
     
   def getBestNHeuristics(self, name, N):
-      """Returns (finalScore, heuristic) pairs, ordered by finalScore"""
+      """Returns a list of heuristics pairs, ordered by their score"""
       cur = self._db.cursor()
-      query = ("SELECT score, formula"
+      query = ("SELECT name, formula, resulttype, Heuristic.ID, score"
                " FROM Heuristic JOIN HeuristicKind"
                " ON Heuristic.kindID=HeuristicKind.ID"
                " WHERE HeuristicKind.name=?"
                " ORDER BY score DESC LIMIT ?")
       cur.execute(query, (name, N))
-      result = [(row[0], row[1]) for row in cur.fetchall()]
+      result = [heuristic.Heuristic(row[0], row[1], row[2], ID=row[3], score=row[4]) for row in cur.fetchall()]
       cur.close()
       return result
 
 
   def getNMostFrequentHeuristics(self, name, N, threshold=1):
-      """Returns (finalScore, heuristic) pairs, ordered by number of uses
+      """Returns a list of heuristics, ordered by number of uses
 and then by score. The score must be greater than the given threshold"""
       cur = self._db.cursor()
-      query = ("SELECT score, formula FROM Heuristic"
+      query = ("SELECT name, formula, resulttype, Heuristic.ID, score FROM Heuristic"
                " JOIN HeuristicKind ON Heuristic.kindID=HeuristicKind.ID"
                " WHERE HeuristicKind.name=? AND score>?"
                " ORDER BY Heuristic.useCount DESC,"
                "  score DESC"
                " LIMIT ?")
       cur.execute(query, (name, threshold, N))
-      result = [(row[0], row[1]) for row in cur.fetchall()]
+      result = [heuristic.Heuristic(row[0], row[1], row[2], ID=row[3], score=row[4]) for row in cur.fetchall()]
       cur.close()
       return result
   
@@ -425,7 +441,7 @@ and then by score. The score must be greater than the given threshold"""
 
   def getHeuristicSet(self, ID):
       cur = self._db.cursor()
-      query = ("SELECT name, formula, resulttype FROM Heuristic"
+      query = ("SELECT name, formula, resulttype, Heuristic.ID FROM Heuristic"
                " JOIN InSet ON Heuristic.ID = InSet.heuristicID"
                " JOIN HeuristicKind ON Heuristic.kindID = HeuristicKind.ID"
                " WHERE setID=?")
@@ -437,7 +453,8 @@ and then by score. The score must be greater than the given threshold"""
           name = row[0]
           formula = row[1]
           resulttype = row[2]
-          hset[name] = heuristic.Heuristic(name, formula, resulttype)
+          ID = row[3]
+          hset[name] = heuristic.Heuristic(name, formula, resulttype, ID=ID)
       
       return hset
       
