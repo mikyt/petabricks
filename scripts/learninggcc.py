@@ -167,6 +167,8 @@ def heuristic_bool_to_flagstring(heuristic, valuemap):
     if useflag:
         return heuristic.name
     else:
+        if heuristic.name.startswith("-fno-"):
+            return "-f"+heuristic.name[5:]
         return "-fno-"+heuristic.name[2:]
     
 def heuristic_int_to_flagstring(heuristic, valuemap):
@@ -181,7 +183,7 @@ def heuristic_int_to_flagstring(heuristic, valuemap):
         
 
     if heuristic.name=="-O":
-        return "-O"+str(value)
+        return "-O"+str(int(value))
 
     return "%s=%d" % (heuristic.name, value)    
     
