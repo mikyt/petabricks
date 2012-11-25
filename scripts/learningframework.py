@@ -252,8 +252,8 @@ getting the current best heuristics, without modifying them"""
     heuristicLists = {}
     for heur in neededHeuristics:
         kind = heur.name
-        heuristicLists[kind] = [heur.derive_heuristic(formula)
-                                for (finalScore, formula)
+        heuristicLists[kind] = [heur.derive_heuristic(h.formula, h.ID)
+                                for h
                                 in get_n_heuristics(kind, eliteSize)]
 
     #Build the sets

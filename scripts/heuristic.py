@@ -20,9 +20,12 @@ resulttype_from_str = formula.resulttype
 
 class Heuristic(object):
   def __init__(self, name, formula, resulttype, uses=None, tooLow=None, tooHigh=None, 
-               min_val=None, max_val=None):
+               min_val=None, max_val=None, ID=None, derivesFrom=None, score=None):
     self._name = name
     self._formula = formula
+    self.ID = ID
+    self.derivesFrom = derivesFrom
+    self.score = score
     
     self.resulttype = resulttype_from_str(resulttype)
 
@@ -57,6 +60,9 @@ class Heuristic(object):
     usesPart = self._buildStringPart("uses", self._uses)
     tooLowPart = self._buildStringPart("tooLow", self._tooLow)
     tooHighPart = self._buildStringPart("tooHigh", self._tooHigh)
+    ID_part = self._buildStringPart("ID", self.ID)
+    derivesFrom_part = self._buildStringPart("derivesFrom", self.derivesFrom)
+    
     type_part = ' type="%s"' % self.resulttype
     
     if self._min == float("-inf"):
@@ -71,14 +77,16 @@ class Heuristic(object):
     
     name=self._name
     
-    return """<heuristic name="%s" formula="%s"%s%s%s%s%s%s />""" % (name,
-                                                                    formula,
-                                                                    usesPart,
-                                                                    tooLowPart,
-                                                                    tooHighPart,
-                                                                    min_part,
-                                                                    max_part,
-                                                                    type_part)
+    return """<heuristic name="%s" formula="%s"%s%s%s%s%s%s%s%s />""" % (name,
+                                                            formula,
+                                                            usesPart,
+                                                            tooLowPart,
+                                                            tooHighPart,
+                                                            min_part,
+                                                            max_part,
+                                                            type_part,
+                                                            ID_part,
+                                                            derivesFrom_part)
   
   def __eq__(self, other):
       if self._name != other._name:
@@ -100,7 +108,7 @@ class Heuristic(object):
       newformula = formula.generate(available_features, resulttype, min_val, 
                                     max_val)
       return Heuristic(name, str(newformula), resulttype, min_val=min_val, 
-                       max_val=max_val)
+                       max_val=max_val, ID=-1)
   
   
   def _buildStringPart(self, varName, variable):
@@ -149,6 +157,8 @@ class Heuristic(object):
 
       
   def evolve(self, available_features):
+    assert self.ID
+    
     formulaObj = maximaparser.parse(self._formula)
     formulaObj.set_available_features(available_features)
     formulaObj.evolve(self._min, self._max)
@@ -158,6 +168,10 @@ class Heuristic(object):
     logger.debug("to:   %s", newformula)
     self._formula = newformula
 
+    if self.ID != -1:
+        self.derivesFrom = self.ID 
+            
+    self.ID = -1
     
   def derive_needed_heuristic(self, available_features):
       """Return a NeededHeuristic object corresponding to the current heuristic.
@@ -287,8 +301,9 @@ heuristics in the database  """
                                     missing_heur.max_val)
           logger.debug(str(heur))
       else:  
-          selected_formula = advancedrandom.random_roulette_selection(bestN)
-          heur = missing_heur.derive_heuristic(selected_formula)
+          for_roulette = [(heur.score, heur) for heur in bestN]
+          selected_heur = advancedrandom.random_roulette_selection(for_roulette)
+          heur = missing_heur.derive_heuristic(selected_heur.formula, selected_heur.ID)
             
       self[heur.name] = heur
       
@@ -331,7 +346,8 @@ is evolved until it becomes different and unique"""
           name = neededHeuristic.name
           try:
               formula = self[name].formula
-              new_hset[name] = neededHeuristic.derive_heuristic(formula)
+              ID = self[name].ID
+              new_hset[name] = neededHeuristic.derive_heuristic(formula, ID)
           except KeyError:
               #No such heuristic in the current hset
               #Just exclude the heuristic from the new hset
@@ -430,7 +446,7 @@ class NeededHeuristic(object):
     def max_val(self):
         return self._max_val
      
-    def derive_heuristic(self, formula):
+    def derive_heuristic(self, formula, ID):
         return Heuristic(self.name, formula, self.resulttype, 
-                         min_val=self.min_val, max_val=self.max_val)
+                         min_val=self.min_val, max_val=self.max_val, ID=ID)
         

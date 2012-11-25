@@ -251,11 +251,14 @@ class TestHeuristic(unittest.TestCase):
         #The ID is surely 1, because it's the only set in the DB
         retrieved = self.db.getHeuristicSet(1)
         
+        self.assertIsNotNone(retrieved.ID)
+        
         for heuristic in hset.itervalues():
             corresponding = retrieved[heuristic.name]
             self.assertIsNotNone(corresponding)
             self.assertEqual(heuristic.formula, corresponding.formula)
             self.assertEqual(heuristic.resulttype, corresponding.resulttype)
+            self.assertIsNotNone(corresponding.ID)
         
     def test_getNBestHeuristicSubsetID(self):
         #Create Hset
