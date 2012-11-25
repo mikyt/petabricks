@@ -1,0 +1,42 @@
+# This script will launch a series of tests for the GCC implementation of
+# long-term learning. The results will be saved in LOGDIR
+
+TRAININGSET=trainingset.txt
+MINTRIALNUMBER=6
+GENERATIONS=3
+TESTPROGRAM=cbench/telecom_gsm
+ITERATIONNUMBER=5
+SCRATCH=scratch
+CBENCHDIR=../cbench
+PETABRICKSDIR=$HOME/programmi/petabricks
+
+CURRENT=`pwd`
+LOGDIR=$CURRENT/log
+TMPDIR=/tmp
+SETTINGS=$LOGDIR/settings.txt
+
+echo "Removing old log directory (if any)"
+rm -rf $LOGDIR
+mkdir -p $LOGDIR
+
+echo "TrainingSet: $TRAININGSET" > $SETTINGS
+echo "MinTrialNumber: $MINTRIALNUMBER" >> $SETTINGS
+echo "Generations: $GENERATIONS" >> $SETTINGS
+echo "TestProgram: $TESTPROGRAM" >> $SETTINGS
+echo "IterationNumber: $ITERATIONNUMBER" >> $SETTINGS
+echo "----------------------------------------"
+echo "Removing cbench from local scratch (if any)"
+rm -rf $SCRATCH
+
+echo "Copying cbench to local scratch"
+mkdir -p $SCRATCH
+cp -r $CBENCHDIR $SCRATCH/
+
+echo "Launching tests"
+cd $SCRATCH/cbench
+time for i in `seq $ITERATIONNUMBER`; do KNOWLEDGE=$LOGDIR/knowledge$i.db; LOGFILE=$LOGDIR/log$i.txt; $PETABRICKSDIR/scripts/learninggcctester.py --logfile=$LOGFILE --resultfile=$LOGDIR/training-results$i.dat --knowledge=$KNOWLEDGE --trainingset=$TRAININGSET --mintrialnumber=$MINTRIALNUMBER --generations=$GENERATIONS $TESTPROGRAM; done
+
+cd $CURRENT
+
+echo "Removing cbench from local scratch"
+rm -rf $SCRATCH
