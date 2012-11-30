@@ -363,7 +363,24 @@ class HeuristicDB:
     self.commit()
     cur.close()
     
-    
+  def getHeuristic(self, ID):
+      """Returns a  heuristic given its ID"""
+      cur = self._db.cursor()
+      query = ("SELECT name, formula, resulttype, Heuristic.ID, score,"
+               " derivesFrom FROM Heuristic JOIN HeuristicKind"
+               " ON Heuristic.kindID=HeuristicKind.ID"
+               " WHERE Heuristic.ID=?")
+      cur.execute(query, (str(ID),))
+      rows = cur.fetchall()
+      if len(rows)==0:
+          raise HeuristicNotFoundError
+      row = rows[0]
+      derivesFrom = row[5] if row[5] != "NULL" else None
+      result = heuristic.Heuristic(row[0], row[1], row[2], ID=row[3], 
+                                   score=row[4], derivesFrom=derivesFrom)
+      cur.close()
+      return result
+      
   def getBestNHeuristics(self, name, N):
       """Returns a list of heuristics pairs, ordered by their score"""
       cur = self._db.cursor()
@@ -441,21 +458,19 @@ and then by score. The score must be greater than the given threshold"""
 
   def getHeuristicSet(self, ID):
       cur = self._db.cursor()
-      query = ("SELECT name, formula, resulttype, Heuristic.ID FROM Heuristic"
+      query = ("SELECT Heuristic.ID FROM Heuristic"
                " JOIN InSet ON Heuristic.ID = InSet.heuristicID"
-               " JOIN HeuristicKind ON Heuristic.kindID = HeuristicKind.ID"
                " WHERE setID=?")
       cur.execute(query, (ID,))
       
+      hset_ids = [row[0] for row in cur.fetchall()]
+      
       hset = heuristic.HeuristicSet()
       hset.ID = ID
-      for row in cur.fetchall():
-          name = row[0]
-          formula = row[1]
-          resulttype = row[2]
-          ID = row[3]
-          hset[name] = heuristic.Heuristic(name, formula, resulttype, ID=ID)
-      
+      for heur_id in hset_ids:
+          heur = self.getHeuristic(heur_id)
+          hset[heur.name] = heur
+                
       return hset
       
   

@@ -16,6 +16,11 @@ CONF_EXPLORATION_PROBABILITY = 0.2
 CONF_MAX_EVOLUTION_RATE = 0.3
 #------------------------------------
 
+
+#-------------- Constants -----------
+RANDOM_HEURISTIC = -1
+#------------------------------------
+
 resulttype_from_str = formula.resulttype
 
 class Heuristic(object):
@@ -108,7 +113,7 @@ class Heuristic(object):
       newformula = formula.generate(available_features, resulttype, min_val, 
                                     max_val)
       return Heuristic(name, str(newformula), resulttype, min_val=min_val, 
-                       max_val=max_val, ID=-1)
+                       max_val=max_val, ID=RANDOM_HEURISTIC)
   
   
   def _buildStringPart(self, varName, variable):
@@ -155,6 +160,11 @@ class Heuristic(object):
   def max_val(self):
       return self._max
 
+  def isInDB(self):
+      return self.ID != RANDOM_HEURISTIC
+      
+  def isDerivedHeuristic(self):
+      return self.derivesFrom != RANDOM_HEURISTIC and self.derivesFrom != None
       
   def evolve(self, available_features):
     assert self.ID
@@ -168,10 +178,10 @@ class Heuristic(object):
     logger.debug("to:   %s", newformula)
     self._formula = newformula
 
-    if self.ID != -1:
+    if self.isInDB():
         self.derivesFrom = self.ID 
             
-    self.ID = -1
+    self.ID = RANDOM_HEURISTIC
     
   def derive_needed_heuristic(self, available_features):
       """Return a NeededHeuristic object corresponding to the current heuristic.
