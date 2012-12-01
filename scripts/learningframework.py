@@ -7,7 +7,7 @@ import mincemeat
 import os.path
 import time
 from heuristic import (AvailableFeatures, Heuristic, HeuristicManager, 
-                      HeuristicSet, NeededHeuristic)
+                      HeuristicSet, NeededHeuristic, ELITE_HEURISTICS)
 
 
 logger = logging.getLogger(__name__)
@@ -20,11 +20,6 @@ NUM_ELITE_BEST= 1
 NUM_ELITE_MOST_FREQUENT = 1
 NUM_ELITE_BEST_SET = 1
 NUM_GENERATIONS = 3
-#------------------------------------------
-
-
-#----------------- Constants --------------
-ELITE_HEURISTICS = -2
 #------------------------------------------
 
 def import_object(moduleName, objectName):
@@ -265,7 +260,7 @@ getting the current best heuristics, without modifying them"""
     try:
       for i in range(eliteSize):
 	newSet = HeuristicSet()
-	newSet.derivesFrom = ELITE_HEURISTICS
+	newSet.derivesFrom = heuristic.ELITE_HEURISTICS
 
 	for heur in neededHeuristics:
               kind=heur.name
