@@ -54,7 +54,8 @@ class HeuristicDB:
                       "FOREIGN KEY ('kindID') REFERENCES 'HeuristicKind' ('ID')"
                       "ON DELETE CASCADE ON UPDATE CASCADE)")
     self._createTable("HeuristicSet", "('ID' INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                       "'score' FLOAT, 'useCount' INTEGER)")
+                                       "'score' FLOAT, 'useCount' INTEGER, "
+                                       "'derivesFrom' INTEGER)")
     self._createTable("InSet", "('setID' INTEGER, 'heuristicID' INTEGER,"
                       "FOREIGN KEY ('setID') REFERENCES 'HeuristicSet' ('ID') "
                       "ON DELETE CASCADE ON UPDATE CASCADE, "
@@ -241,8 +242,9 @@ class HeuristicDB:
       
   def _storeNewHeuristicSetScore(self, heuristicSet, score, useCount):
       cur = self._db.cursor()
-      query = "INSERT INTO HeuristicSet (score, useCount) VALUES (?, ?)"
-      cur.execute(query, (score, useCount))
+      query = ("INSERT INTO HeuristicSet (score, useCount, derivesFrom) "
+               "VALUES (?, ?, ?)")
+      cur.execute(query, (score, useCount, heuristicSet.derivesFrom))
       setID = cur.lastrowid
       self.defer_commits()
       self._storeNewHeuristicSet(heuristicSet, setID)
@@ -270,7 +272,7 @@ class HeuristicDB:
   
   
   def _getHeuristicSetID_unchecked(self, heuristicSet):
-      if hasattr(heuristicSet, "ID"):
+      if heuristicSet.isInDB():
           #Result already cached!
           return heuristicSet.ID
           
@@ -456,6 +458,17 @@ and then by score. The score must be greater than the given threshold"""
     cur.close()
     return result
 
+  def _getHeuristicSetDerivesFrom(self, ID):
+      cur = self._db.cursor()
+      query = "SELECT derivesFrom FROM HeuristicSet WHERE ID=?"
+      cur.execute(query, (ID,))
+      rows = cur.fetchall()
+      if len(rows) == 0:
+          raise HeuristicSetNotFoundError
+      cur.close()
+      derivesFrom = rows[0]
+      return derivesFrom
+      
   def getHeuristicSet(self, ID):
       cur = self._db.cursor()
       query = ("SELECT Heuristic.ID FROM Heuristic"
@@ -467,10 +480,12 @@ and then by score. The score must be greater than the given threshold"""
       
       hset = heuristic.HeuristicSet()
       hset.ID = ID
+      hset.derivesFrom = self._getHeuristicSetDerivesFrom(ID)
       for heur_id in hset_ids:
           heur = self.getHeuristic(heur_id)
           hset[heur.name] = heur
                 
+      cur.close()
       return hset
       
   
