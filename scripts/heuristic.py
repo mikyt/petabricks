@@ -19,6 +19,7 @@ CONF_MAX_EVOLUTION_RATE = 0.3
 
 #-------------- Constants -----------
 RANDOM_HEURISTIC = -1
+ELITE_HEURISTICS = -2
 #------------------------------------
 
 resulttype_from_str = formula.resulttype
@@ -162,7 +163,7 @@ class Heuristic(object):
 
   def isInDB(self):
       return self.ID != RANDOM_HEURISTIC
-      
+  
   def isDerivedHeuristic(self):
       return self.derivesFrom != RANDOM_HEURISTIC and self.derivesFrom != None
       
@@ -324,6 +325,9 @@ heuristics in the database  """
       
   def isInDB(self):
       return self.ID != RANDOM_HEURISTIC
+  
+  def isDerivedSet(self):
+      return self.derivesFrom != None and self.derivesFrom != ELITE_HEURISTICS
       
   def evolve(self, all_available_features):
       if random.random() < CONF_EXPLORATION_PROBABILITY:

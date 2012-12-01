@@ -465,8 +465,8 @@ and then by score. The score must be greater than the given threshold"""
       rows = cur.fetchall()
       if len(rows) == 0:
           raise HeuristicSetNotFoundError
+      (derivesFrom, ) = rows[0]
       cur.close()
-      derivesFrom = rows[0]
       return derivesFrom
       
   def getHeuristicSet(self, ID):
