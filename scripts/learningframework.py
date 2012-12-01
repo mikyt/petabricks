@@ -260,7 +260,7 @@ getting the current best heuristics, without modifying them"""
     try:
       for i in range(eliteSize):
 	newSet = HeuristicSet()
-	newSet.derivesFrom = heuristic.ELITE_HEURISTICS
+	newSet.derivesFrom = ELITE_HEURISTICS
 
 	for heur in neededHeuristics:
               kind=heur.name
