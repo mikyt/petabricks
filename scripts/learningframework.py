@@ -22,6 +22,11 @@ NUM_ELITE_BEST_SET = 1
 NUM_GENERATIONS = 3
 #------------------------------------------
 
+
+#----------------- Constants --------------
+ELITE_HEURISTICS = -2
+#------------------------------------------
+
 def import_object(moduleName, objectName):
   module = __import__(moduleName)
   return getattr(module, objectName)
@@ -260,6 +265,7 @@ getting the current best heuristics, without modifying them"""
     try:
       for i in range(eliteSize):
 	newSet = HeuristicSet()
+	newSet.derivesFrom = ELITE_HEURISTICS
 
 	for heur in neededHeuristics:
               kind=heur.name

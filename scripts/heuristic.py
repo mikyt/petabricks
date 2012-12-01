@@ -241,6 +241,11 @@ class AvailableFeatures(dict):
 
 class HeuristicSet(dict):
   """Represents a set of heuristics"""
+  
+  def __init__(self):
+      self.ID = RANDOM_HEURISTIC
+      self.derivesFrom = None
+      
   def __setitem__(self, key, value):
     if not isinstance(value, Heuristic):
       raise TypeError
@@ -317,13 +322,20 @@ heuristics in the database  """
             
       self[heur.name] = heur
       
-
+  def isInDB(self):
+      return self.ID != RANDOM_HEURISTIC
+      
   def evolve(self, all_available_features):
       if random.random() < CONF_EXPLORATION_PROBABILITY:
           evolution_rate = random.uniform(0, CONF_MAX_EVOLUTION_RATE)
           tobechanged = max(1, int(len(self)*evolution_rate)) #At least one!
           for _ in range(tobechanged):
               self.forceEvolution(all_available_features)
+              
+          if self.isInDB():
+              self.derivesFrom = self.ID
+          
+          self.ID = RANDOM_HEURISTIC
           
   def forceEvolution(self, all_available_features):
     (name, heuristic) = random.choice(self.items())
@@ -352,6 +364,7 @@ is evolved until it becomes different and unique"""
       The other data of each heuristic (min, max, etc) are taken from 
       neededHeuristics."""
       new_hset = HeuristicSet()
+      new_hset.derivesFrom = self.ID
       for neededHeuristic in neededHeuristics:
           name = neededHeuristic.name
           try:
