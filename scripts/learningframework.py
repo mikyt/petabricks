@@ -393,13 +393,13 @@ result inside the candidates list taken from the additional parameters"""
           
       for generation in xrange(self.num_generations):
           logger.info("Testing generation %d/%d", generation+1, self.num_generations)
-          result = self.use_learning_on_one_generation(benchmark, learn)
+          result = self.use_learning_on_one_generation(benchmark, learn, generation+1)
           if result != 0:
               return result
           
       return result
       
-  def use_learning_on_one_generation(self, benchmark, learn=True):
+  def use_learning_on_one_generation(self, benchmark, learn=True, generation=1):
     logger.info("Using best heuristics on: %s", benchmark)
 
     #Init variables
@@ -407,6 +407,8 @@ result inside the candidates list taken from the additional parameters"""
     additionalParameters={}
 
     additionalParameters["candidates"] = candidates
+    additionalParameters["generation"] = generation
+    additionalParameters["learning"] = learn
 
     if self._setup is not None:
       result = self._setup(benchmark, additionalParameters)
